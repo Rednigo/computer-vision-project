@@ -260,9 +260,7 @@ class AerialImageLoader:
         # Marker labelling
         ret, markers = cv2.connectedComponents(sure_fg)
 
-        # Add one to all labels so that sure background is not 0, but 1
-        markers = markers + 1
-
+        # Now, mark the region of unknown with zero
         markers[unknown == 255] = 0
 
         markers = cv2.watershed(self.image, markers)
@@ -278,6 +276,7 @@ class AerialImageLoader:
             rect (tuple): A rectangle (x, y, w, h) to initialize the GrabCut algorithm.
 
         Returns:
+            np.ndarray: The segmented image using the GrabCut algorithm.
         """
         if self.image is None:
             raise ValueError("No image loaded")
@@ -293,70 +292,160 @@ class AerialImageLoader:
 
         return segmented_image
 
-def main():
-    """Main function to load and display images."""
-    # Create a Tkinter root window (it will not be shown)
-    root = Tk()
-    root.withdraw()
+    def detect_contours(self):
+        """
+        Detects contours in the loaded image.
 
-    # Open a file dialog to select one or multiple images
-    image_paths = filedialog.askopenfilenames(title="Select Images", filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp *.tif *.tiff")])
+        Returns:
+            list: A list of detected contours.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
 
-    if not image_paths:
-        print("No images selected")
-        return
+        gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        blurred_image = cv2.GaussianBlur(gray_image, (5, 5), 0)
+        edged_image = cv2.Canny(blurred_image, 50, 150)
+        contours, _ = cv2.findContours(edged_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        return contours
 
-    # Create an image loader object
-    loader = AerialImageLoader()
+    def draw_contours(self, contours):
+        """
+        Draws contours on the loaded image.
 
-    # Load and display each selected image
-    for image_path in image_paths:
-        loader.load_and_display(image_path)
+        Args:
+            contours (list): A list of contours to draw.
 
-        # Print image properties
-        properties = loader.get_image_properties()
-        for key, value in properties.items():
-            print(f"{key}: {value}")
+        Returns:
+            np.ndarray: The image with drawn contours.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
 
-        # Plot brightness histogram
-        loader.plot_brightness_histogram()
+        image_with_contours = self.image.copy()
+        cv2.drawContours(image_with_contours, contours, -1, (0, 255, 0), 2)
+        return image_with_contours
 
-        # Denoise and display the denoised image
-        denoised_image = loader.denoise_image(method='gaussian', ksize=(5, 5), sigma=1)
-        cv2.imshow('Denoised Image', denoised_image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    def detect_features(self, method='SIFT'):
+        """
+        Detects features in the loaded image using the specified method.
 
-        # Sharpen and display the sharpened image
-        sharpened_image = loader.sharpen_image(method='unsharp_mask', amount=1.5)
-        cv2.imshow('Sharpened Image', sharpened_image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        Args:
+            method (str): The feature detection method to use ('SIFT', 'ORB', 'HOG').
 
-        # Apply threshold segmentation
-        thresholded_image = loader.threshold_segmentation(threshold_value=127)
-        cv2.imshow('Threshold Segmentation', thresholded_image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        Returns:
+            list: A list of detected keypoints.
+            np.ndarray: The image with drawn keypoints.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
 
-        # Apply Otsu's segmentation
-        otsu_image = loader.otsu_segmentation()
-        cv2.imshow('Otsu Segmentation', otsu_image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
 
-        # Apply Watershed segmentation
-        watershed_image = loader.watershed_segmentation()
-        cv2.imshow('Watershed Segmentation', watershed_image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        if method == 'SIFT':
+            sift = cv2.SIFT_create()
+            keypoints, descriptors = sift.detectAndCompute(gray_image, None)
+        elif method == 'ORB':
+            orb = cv2.ORB_create()
+            keypoints, descriptors = orb.detectAndCompute(gray_image, None)
+        elif method == 'HOG':
+            hog = cv2.HOGDescriptor()
+            keypoints = hog.detect(gray_image, None)
+            keypoints = [cv2.KeyPoint(x[0][0], x[0][1], 1) for x in keypoints[0]]
+        else:
+            raise ValueError("Unknown feature detection method")
 
-        # Apply GrabCut segmentation
-        rect = (50, 50, 450, 290)  # Example rectangle
-        grabcut_image = loader.grabcut_segmentation(rect)
-        cv2.imshow('GrabCut Segmentation', grabcut_image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        image_with_keypoints = cv2.drawKeypoints(self.image, keypoints, None, color=(0, 255, 0))
+        return keypoints, image_with_keypoints
 
-if __name__ == "__main__":
-    main()
+# def main():
+#     """Main function to load and display images."""
+#     # Create a Tkinter root window (it will not be shown)
+#     root = Tk()
+#     root.withdraw()
+#
+#     # Open a file dialog to select one or multiple images
+#     image_paths = filedialog.askopenfilenames(title="Select Images", filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp *.tif *.tiff")])
+#
+#     if not image_paths:
+#         print("No images selected")
+#         return
+#
+#     # Create an image loader object
+#     loader = AerialImageLoader()
+#
+#     # Load and display each selected image
+#     for image_path in image_paths:
+#         loader.load_and_display(image_path)
+#
+#         # Print image properties
+#         properties = loader.get_image_properties()
+#         for key, value in properties.items():
+#             print(f"{key}: {value}")
+#
+#         # Plot brightness histogram
+#         loader.plot_brightness_histogram()
+#
+#         # Denoise and display the denoised image
+#         denoised_image = loader.denoise_image(method='gaussian', ksize=(5, 5), sigma=1)
+#         cv2.imshow('Denoised Image', denoised_image)
+#         cv2.waitKey(0)
+#         cv2.destroyAllWindows()
+#
+#         # Sharpen and display the sharpened image
+#         sharpened_image = loader.sharpen_image(method='unsharp_mask', amount=1.5)
+#         cv2.imshow('Sharpened Image', sharpened_image)
+#         cv2.waitKey(0)
+#         cv2.destroyAllWindows()
+#
+#         # Apply threshold segmentation
+#         thresholded_image = loader.threshold_segmentation(threshold_value=127)
+#         cv2.imshow('Threshold Segmentation', thresholded_image)
+#         cv2.waitKey(0)
+#         cv2.destroyAllWindows()
+#
+#         # Apply Otsu's segmentation
+#         otsu_image = loader.otsu_segmentation()
+#         cv2.imshow('Otsu Segmentation', otsu_image)
+#         cv2.waitKey(0)
+#         cv2.destroyAllWindows()
+#
+#         # Apply Watershed segmentation
+#         watershed_image = loader.watershed_segmentation()
+#         cv2.imshow('Watershed Segmentation', watershed_image)
+#         cv2.waitKey(0)
+#         cv2.destroyAllWindows()
+#
+#         # Apply GrabCut segmentation
+#         rect = (50, 50, 450, 290)  # Example rectangle
+#         grabcut_image = loader.grabcut_segmentation(rect)
+#         cv2.imshow('GrabCut Segmentation', grabcut_image)
+#         cv2.waitKey(0)
+#         cv2.destroyAllWindows()
+#
+#         # Detect and draw contours
+#         contours = loader.detect_contours()
+#         image_with_contours = loader.draw_contours(contours)
+#         cv2.imshow('Contours', image_with_contours)
+#         cv2.waitKey(0)
+#         cv2.destroyAllWindows()
+#
+#         # Detect and display features using SIFT
+#         keypoints, image_with_keypoints = loader.detect_features(method='SIFT')
+#         cv2.imshow('SIFT Features', image_with_keypoints)
+#         cv2.waitKey(0)
+#         cv2.destroyAllWindows()
+#
+#         # Detect and display features using ORB
+#         keypoints, image_with_keypoints = loader.detect_features(method='ORB')
+#         cv2.imshow('ORB Features', image_with_keypoints)
+#         cv2.waitKey(0)
+#         cv2.destroyAllWindows()
+#
+#         # Detect and display features using HOG
+#         keypoints, image_with_keypoints = loader.detect_features(method='HOG')
+#         cv2.imshow('HOG Features', image_with_keypoints)
+#         cv2.waitKey(0)
+#         cv2.destroyAllWindows()
+#
+# if __name__ == "__main__":
+#     main()
