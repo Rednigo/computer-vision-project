@@ -140,6 +140,64 @@ class AerialImageLoader:
             raise ValueError("Unknown enhancement method")
 
         return enhanced_image
+
+    def denoise_image(self, method='gaussian', **kwargs):
+        """
+        Denoises the loaded image using the specified method.
+
+        Args:
+            method (str): The denoising method to use ('gaussian', 'median', 'bilateral').
+            kwargs: Additional parameters for the denoising methods.
+
+        Returns:
+            np.ndarray: The denoised image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+
+        if method == 'gaussian':
+            ksize = kwargs.get('ksize', (5, 5))
+            sigma = kwargs.get('sigma', 0)
+            denoised_image = cv2.GaussianBlur(self.image, ksize, sigma)
+        elif method == 'median':
+            ksize = kwargs.get('ksize', 5)
+            denoised_image = cv2.medianBlur(self.image, ksize)
+        elif method == 'bilateral':
+            d = kwargs.get('d', 9)
+            sigma_color = kwargs.get('sigma_color', 75)
+            sigma_space = kwargs.get('sigma_space', 75)
+            denoised_image = cv2.bilateralFilter(self.image, d, sigma_color, sigma_space)
+        else:
+            raise ValueError("Unknown denoising method")
+
+        return denoised_image
+
+    def sharpen_image(self, method='unsharp_mask', **kwargs):
+        """
+        Sharpens the loaded image using the specified method.
+
+        Args:
+            method (str): The sharpening method to use ('unsharp_mask', 'laplacian').
+            kwargs: Additional parameters for the sharpening methods.
+
+        Returns:
+            np.ndarray: The sharpened image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+
+        if method == 'unsharp_mask':
+            amount = kwargs.get('amount', 1.0)
+            blurred = cv2.GaussianBlur(self.image, (0, 0), 3)
+            sharpened_image = cv2.addWeighted(self.image, 1 + amount, blurred, -amount, 0)
+        elif method == 'laplacian':
+            kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+            sharpened_image = cv2.filter2D(self.image, -1, kernel)
+        else:
+            raise ValueError("Unknown sharpening method")
+
+        return sharpened_image
+
 def main():
     """Main function to load and display images."""
     # Create a Tkinter root window (it will not be shown)
@@ -168,9 +226,15 @@ def main():
         # Plot brightness histogram
         loader.plot_brightness_histogram()
 
-        # Enhance contrast and display the enhanced image
-        enhanced_image = loader.enhance_contrast(method='clahe')
-        cv2.imshow('Enhanced Image', enhanced_image)
+        # Denoise and display the denoised image
+        denoised_image = loader.denoise_image(method='gaussian', ksize=(5, 5), sigma=1)
+        cv2.imshow('Denoised Image', denoised_image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+        # Sharpen and display the sharpened image
+        sharpened_image = loader.sharpen_image(method='unsharp_mask', amount=1.5)
+        cv2.imshow('Sharpened Image', sharpened_image)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
