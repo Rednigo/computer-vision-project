@@ -198,6 +198,101 @@ class AerialImageLoader:
 
         return sharpened_image
 
+    def threshold_segmentation(self, threshold_value=127, max_value=255):
+        """
+        Applies simple threshold segmentation to the loaded image.
+
+        Args:
+            threshold_value (int): The threshold value.
+            max_value (int): The maximum value to use with the THRESH_BINARY and THRESH_BINARY_INV thresholding types.
+
+        Returns:
+            np.ndarray: The thresholded image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+
+        gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        _, thresholded_image = cv2.threshold(gray_image, threshold_value, max_value, cv2.THRESH_BINARY)
+        return thresholded_image
+
+    def otsu_segmentation(self):
+        """
+        Applies Otsu's thresholding method to the loaded image.
+
+        Returns:
+            np.ndarray: The thresholded image using Otsu's method.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+
+        gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        _, otsu_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        return otsu_image
+
+    def watershed_segmentation(self):
+        """
+        Applies the Watershed algorithm to the loaded image.
+
+        Returns:
+            np.ndarray: The segmented image using the Watershed algorithm.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+
+        gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        ret, thresh = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+        # Noise removal
+        kernel = np.ones((3, 3), np.uint8)
+        opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
+
+        # Sure background area
+        sure_bg = cv2.dilate(opening, kernel, iterations=3)
+
+        dist_transform = cv2.distanceTransform(opening, cv2.DIST_L2, 5)
+        ret, sure_fg = cv2.threshold(dist_transform, 0.7 * dist_transform.max(), 255, 0)
+
+        # Finding unknown region
+        sure_fg = np.uint8(sure_fg)
+        unknown = cv2.subtract(sure_bg, sure_fg)
+
+        # Marker labelling
+        ret, markers = cv2.connectedComponents(sure_fg)
+
+        # Add one to all labels so that sure background is not 0, but 1
+        markers = markers + 1
+
+        markers[unknown == 255] = 0
+
+        markers = cv2.watershed(self.image, markers)
+        self.image[markers == -1] = [255, 0, 0]
+
+        return self.image
+
+    def grabcut_segmentation(self, rect):
+        """
+        Applies the GrabCut algorithm to the loaded image.
+
+        Args:
+            rect (tuple): A rectangle (x, y, w, h) to initialize the GrabCut algorithm.
+
+        Returns:
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+
+        mask = np.zeros(self.image.shape[:2], np.uint8)
+        bgd_model = np.zeros((1, 65), np.float64)
+        fgd_model = np.zeros((1, 65), np.float64)
+
+        cv2.grabCut(self.image, mask, rect, bgd_model, fgd_model, 5, cv2.GC_INIT_WITH_RECT)
+
+        mask2 = np.where((mask == 2) | (mask == 0), 0, 1).astype('uint8')
+        segmented_image = self.image * mask2[:, :, np.newaxis]
+
+        return segmented_image
+
 def main():
     """Main function to load and display images."""
     # Create a Tkinter root window (it will not be shown)
@@ -235,6 +330,31 @@ def main():
         # Sharpen and display the sharpened image
         sharpened_image = loader.sharpen_image(method='unsharp_mask', amount=1.5)
         cv2.imshow('Sharpened Image', sharpened_image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+        # Apply threshold segmentation
+        thresholded_image = loader.threshold_segmentation(threshold_value=127)
+        cv2.imshow('Threshold Segmentation', thresholded_image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+        # Apply Otsu's segmentation
+        otsu_image = loader.otsu_segmentation()
+        cv2.imshow('Otsu Segmentation', otsu_image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+        # Apply Watershed segmentation
+        watershed_image = loader.watershed_segmentation()
+        cv2.imshow('Watershed Segmentation', watershed_image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+        # Apply GrabCut segmentation
+        rect = (50, 50, 450, 290)  # Example rectangle
+        grabcut_image = loader.grabcut_segmentation(rect)
+        cv2.imshow('GrabCut Segmentation', grabcut_image)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
