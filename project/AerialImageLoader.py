@@ -357,95 +357,178 @@ class AerialImageLoader:
         image_with_keypoints = cv2.drawKeypoints(self.image, keypoints, None, color=(0, 255, 0))
         return keypoints, image_with_keypoints
 
-# def main():
-#     """Main function to load and display images."""
-#     # Create a Tkinter root window (it will not be shown)
-#     root = Tk()
-#     root.withdraw()
-#
-#     # Open a file dialog to select one or multiple images
-#     image_paths = filedialog.askopenfilenames(title="Select Images", filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp *.tif *.tiff")])
-#
-#     if not image_paths:
-#         print("No images selected")
-#         return
-#
-#     # Create an image loader object
-#     loader = AerialImageLoader()
-#
-#     # Load and display each selected image
-#     for image_path in image_paths:
-#         loader.load_and_display(image_path)
-#
-#         # Print image properties
-#         properties = loader.get_image_properties()
-#         for key, value in properties.items():
-#             print(f"{key}: {value}")
-#
-#         # Plot brightness histogram
-#         loader.plot_brightness_histogram()
-#
-#         # Denoise and display the denoised image
-#         denoised_image = loader.denoise_image(method='gaussian', ksize=(5, 5), sigma=1)
-#         cv2.imshow('Denoised Image', denoised_image)
-#         cv2.waitKey(0)
-#         cv2.destroyAllWindows()
-#
-#         # Sharpen and display the sharpened image
-#         sharpened_image = loader.sharpen_image(method='unsharp_mask', amount=1.5)
-#         cv2.imshow('Sharpened Image', sharpened_image)
-#         cv2.waitKey(0)
-#         cv2.destroyAllWindows()
-#
-#         # Apply threshold segmentation
-#         thresholded_image = loader.threshold_segmentation(threshold_value=127)
-#         cv2.imshow('Threshold Segmentation', thresholded_image)
-#         cv2.waitKey(0)
-#         cv2.destroyAllWindows()
-#
-#         # Apply Otsu's segmentation
-#         otsu_image = loader.otsu_segmentation()
-#         cv2.imshow('Otsu Segmentation', otsu_image)
-#         cv2.waitKey(0)
-#         cv2.destroyAllWindows()
-#
-#         # Apply Watershed segmentation
-#         watershed_image = loader.watershed_segmentation()
-#         cv2.imshow('Watershed Segmentation', watershed_image)
-#         cv2.waitKey(0)
-#         cv2.destroyAllWindows()
-#
-#         # Apply GrabCut segmentation
-#         rect = (50, 50, 450, 290)  # Example rectangle
-#         grabcut_image = loader.grabcut_segmentation(rect)
-#         cv2.imshow('GrabCut Segmentation', grabcut_image)
-#         cv2.waitKey(0)
-#         cv2.destroyAllWindows()
-#
-#         # Detect and draw contours
-#         contours = loader.detect_contours()
-#         image_with_contours = loader.draw_contours(contours)
-#         cv2.imshow('Contours', image_with_contours)
-#         cv2.waitKey(0)
-#         cv2.destroyAllWindows()
-#
-#         # Detect and display features using SIFT
-#         keypoints, image_with_keypoints = loader.detect_features(method='SIFT')
-#         cv2.imshow('SIFT Features', image_with_keypoints)
-#         cv2.waitKey(0)
-#         cv2.destroyAllWindows()
-#
-#         # Detect and display features using ORB
-#         keypoints, image_with_keypoints = loader.detect_features(method='ORB')
-#         cv2.imshow('ORB Features', image_with_keypoints)
-#         cv2.waitKey(0)
-#         cv2.destroyAllWindows()
-#
-#         # Detect and display features using HOG
-#         keypoints, image_with_keypoints = loader.detect_features(method='HOG')
-#         cv2.imshow('HOG Features', image_with_keypoints)
-#         cv2.waitKey(0)
-#         cv2.destroyAllWindows()
-#
-# if __name__ == "__main__":
-#     main()
+    # Week 7: Geometric Transformations
+
+    def resize_image(self, width=None, height=None, scale=None, method=cv2.INTER_LINEAR):
+        """
+        Resizes the loaded image.
+
+        Args:
+            width (int, optional): The target width in pixels.
+            height (int, optional): The target height in pixels.
+            scale (float, optional): Scale factor for both dimensions.
+            method: Interpolation method to use (default: cv2.INTER_LINEAR).
+
+        Returns:
+            np.ndarray: The resized image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+
+        if scale is not None:
+            new_width = int(self.image.shape[1] * scale)
+            new_height = int(self.image.shape[0] * scale)
+        elif width is not None and height is not None:
+            new_width = width
+            new_height = height
+        elif width is not None:
+            aspect_ratio = width / float(self.image.shape[1])
+            new_width = width
+            new_height = int(self.image.shape[0] * aspect_ratio)
+        elif height is not None:
+            aspect_ratio = height / float(self.image.shape[0])
+            new_height = height
+            new_width = int(self.image.shape[1] * aspect_ratio)
+        else:
+            raise ValueError("Either scale, width, height, or both width and height must be specified")
+
+        resized_image = cv2.resize(self.image, (new_width, new_height), interpolation=method)
+        return resized_image
+
+    def rotate_image(self, angle, scale=1.0, center=None):
+        """
+        Rotates the loaded image.
+
+        Args:
+            angle (float): Rotation angle in degrees.
+            scale (float, optional): Scaling factor.
+            center (tuple, optional): Center of rotation. If None, the center of the image is used.
+
+        Returns:
+            np.ndarray: The rotated image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+
+        h, w = self.image.shape[:2]
+        if center is None:
+            center = (w // 2, h // 2)
+
+        # Get the rotation matrix
+        M = cv2.getRotationMatrix2D(center, angle, scale)
+
+        # Calculate the new bounds to ensure the entire rotated image is visible
+        cos = np.abs(M[0, 0])
+        sin = np.abs(M[0, 1])
+        new_w = int((h * sin) + (w * cos))
+        new_h = int((h * cos) + (w * sin))
+
+        # Adjust the rotation matrix to account for translation
+        M[0, 2] += (new_w / 2) - center[0]
+        M[1, 2] += (new_h / 2) - center[1]
+
+        # Perform the actual rotation
+        rotated_image = cv2.warpAffine(self.image, M, (new_w, new_h))
+        return rotated_image
+
+    def affine_transform(self, src_points, dst_points):
+        """
+        Applies an affine transformation to the loaded image.
+
+        Args:
+            src_points (np.array): Source points in the input image (3 points).
+            dst_points (np.array): Destination points in the output image (3 points).
+
+        Returns:
+            np.ndarray: The transformed image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+
+        if len(src_points) != 3 or len(dst_points) != 3:
+            raise ValueError("Affine transformation requires exactly 3 points")
+
+        height, width = self.image.shape[:2]
+
+        # Calculate the transformation matrix
+        M = cv2.getAffineTransform(np.float32(src_points), np.float32(dst_points))
+
+        # Apply the affine transformation
+        affine_img = cv2.warpAffine(self.image, M, (width, height))
+        return affine_img
+
+    def perspective_transform(self, src_points, dst_points):
+        """
+        Applies a perspective transformation to the loaded image.
+
+        Args:
+            src_points (np.array): Source points in the input image (4 points).
+            dst_points (np.array): Destination points in the output image (4 points).
+
+        Returns:
+            np.ndarray: The transformed image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+
+        if len(src_points) != 4 or len(dst_points) != 4:
+            raise ValueError("Perspective transformation requires exactly 4 points")
+
+        # Calculate the perspective transformation matrix
+        M = cv2.getPerspectiveTransform(np.float32(src_points), np.float32(dst_points))
+
+        # Calculate the output size
+        min_x = min(dst_points[:, 0])
+        max_x = max(dst_points[:, 0])
+        min_y = min(dst_points[:, 1])
+        max_y = max(dst_points[:, 1])
+        
+        output_size = (int(max_x - min_x), int(max_y - min_y))
+        
+        # Apply the perspective transformation
+        warped_img = cv2.warpPerspective(self.image, M, output_size)
+        return warped_img
+
+    def crop_image(self, x, y, width, height):
+        """
+        Crops a region from the loaded image.
+
+        Args:
+            x (int): X-coordinate of the top-left corner.
+            y (int): Y-coordinate of the top-left corner.
+            width (int): Width of the region.
+            height (int): Height of the region.
+
+        Returns:
+            np.ndarray: The cropped image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+
+        # Ensure crop region is within image bounds
+        h, w = self.image.shape[:2]
+        x = max(0, x)
+        y = max(0, y)
+        width = min(w - x, width)
+        height = min(h - y, height)
+
+        cropped_img = self.image[y:y+height, x:x+width]
+        return cropped_img
+
+    def flip_image(self, flip_code):
+        """
+        Flips the loaded image.
+
+        Args:
+            flip_code (int): 0 for flipping around the x-axis (vertically),
+                            1 for flipping around the y-axis (horizontally),
+                            -1 for flipping around both axes.
+
+        Returns:
+            np.ndarray: The flipped image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+
+        flipped_img = cv2.flip(self.image, flip_code)
+        return flipped_img
