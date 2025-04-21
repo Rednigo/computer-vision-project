@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 class AerialImageLoader:
     """
-    Simplified class for loading and displaying aerial images.
+    Class for loading and processing aerial images.
     """
 
     def __init__(self, image_dir=None):
@@ -521,8 +521,8 @@ class AerialImageLoader:
 
         Args:
             flip_code (int): 0 for flipping around the x-axis (vertically),
-                            1 for flipping around the y-axis (horizontally),
-                            -1 for flipping around both axes.
+                           1 for flipping around the y-axis (horizontally),
+                           -1 for flipping around both axes.
 
         Returns:
             np.ndarray: The flipped image.
@@ -532,3 +532,468 @@ class AerialImageLoader:
 
         flipped_img = cv2.flip(self.image, flip_code)
         return flipped_img
+        
+    # Week 8: Morphological Operations
+    
+    def apply_erosion(self, kernel_size=5, iterations=1):
+        """
+        Applies erosion to the loaded image.
+        
+        Args:
+            kernel_size (int): Size of the structuring element.
+            iterations (int): Number of times erosion is applied.
+            
+        Returns:
+            np.ndarray: The eroded image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        # Convert to grayscale if image is color
+        if len(self.image.shape) > 2:
+            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = self.image.copy()
+            
+        # Apply thresholding if needed
+        if gray.dtype != np.uint8 or np.max(gray) != 255 or np.min(gray) != 0:
+            _, gray = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+            
+        # Create kernel
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        
+        # Apply erosion
+        eroded = cv2.erode(gray, kernel, iterations=iterations)
+        
+        return eroded
+        
+    def apply_dilation(self, kernel_size=5, iterations=1):
+        """
+        Applies dilation to the loaded image.
+        
+        Args:
+            kernel_size (int): Size of the structuring element.
+            iterations (int): Number of times dilation is applied.
+            
+        Returns:
+            np.ndarray: The dilated image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        # Convert to grayscale if image is color
+        if len(self.image.shape) > 2:
+            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = self.image.copy()
+            
+        # Apply thresholding if needed
+        if gray.dtype != np.uint8 or np.max(gray) != 255 or np.min(gray) != 0:
+            _, gray = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+            
+        # Create kernel
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        
+        # Apply dilation
+        dilated = cv2.dilate(gray, kernel, iterations=iterations)
+        
+        return dilated
+        
+    def apply_opening(self, kernel_size=5, iterations=1):
+        """
+        Applies opening (erosion followed by dilation) to the loaded image.
+        
+        Args:
+            kernel_size (int): Size of the structuring element.
+            iterations (int): Number of times opening is applied.
+            
+        Returns:
+            np.ndarray: The opened image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        # Convert to grayscale if image is color
+        if len(self.image.shape) > 2:
+            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = self.image.copy()
+            
+        # Apply thresholding if needed
+        if gray.dtype != np.uint8 or np.max(gray) != 255 or np.min(gray) != 0:
+            _, gray = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+            
+        # Create kernel
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        
+        # Apply opening
+        opened = cv2.morphologyEx(gray, cv2.MORPH_OPEN, kernel, iterations=iterations)
+        
+        return opened
+        
+    def apply_closing(self, kernel_size=5, iterations=1):
+        """
+        Applies closing (dilation followed by erosion) to the loaded image.
+        
+        Args:
+            kernel_size (int): Size of the structuring element.
+            iterations (int): Number of times closing is applied.
+            
+        Returns:
+            np.ndarray: The closed image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        # Convert to grayscale if image is color
+        if len(self.image.shape) > 2:
+            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = self.image.copy()
+            
+        # Apply thresholding if needed
+        if gray.dtype != np.uint8 or np.max(gray) != 255 or np.min(gray) != 0:
+            _, gray = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+            
+        # Create kernel
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        
+        # Apply closing
+        closed = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, kernel, iterations=iterations)
+        
+        return closed
+        
+    def apply_morphological_gradient(self, kernel_size=5):
+        """
+        Applies morphological gradient (dilation - erosion) to the loaded image.
+        
+        Args:
+            kernel_size (int): Size of the structuring element.
+            
+        Returns:
+            np.ndarray: The gradient image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        # Convert to grayscale if image is color
+        if len(self.image.shape) > 2:
+            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = self.image.copy()
+            
+        # Apply thresholding if needed
+        if gray.dtype != np.uint8 or np.max(gray) != 255 or np.min(gray) != 0:
+            _, gray = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+            
+        # Create kernel
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        
+        # Apply morphological gradient
+        gradient = cv2.morphologyEx(gray, cv2.MORPH_GRADIENT, kernel)
+        
+        return gradient
+        
+    def apply_top_hat(self, kernel_size=5):
+        """
+        Applies top hat transformation (original - opening) to the loaded image.
+        
+        Args:
+            kernel_size (int): Size of the structuring element.
+            
+        Returns:
+            np.ndarray: The top hat transformed image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        # Convert to grayscale if image is color
+        if len(self.image.shape) > 2:
+            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = self.image.copy()
+            
+        # Create kernel
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        
+        # Apply top hat
+        top_hat = cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, kernel)
+        
+        return top_hat
+        
+    def apply_black_hat(self, kernel_size=5):
+        """
+        Applies black hat transformation (closing - original) to the loaded image.
+        
+        Args:
+            kernel_size (int): Size of the structuring element.
+            
+        Returns:
+            np.ndarray: The black hat transformed image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        # Convert to grayscale if image is color
+        if len(self.image.shape) > 2:
+            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = self.image.copy()
+            
+        # Create kernel
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        
+        # Apply black hat
+        black_hat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel)
+        
+        return black_hat
+        
+    def apply_custom_morphology(self, operation, kernel_shape='rect', kernel_size=5, iterations=1):
+        """
+        Applies a custom morphological operation with specified kernel shape.
+        
+        Args:
+            operation (str): The morphological operation ('erode', 'dilate', 'open', 'close').
+            kernel_shape (str): Shape of the kernel ('rect', 'ellipse', 'cross').
+            kernel_size (int): Size of the structuring element.
+            iterations (int): Number of times operation is applied.
+            
+        Returns:
+            np.ndarray: The processed image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        # Convert to grayscale if image is color
+        if len(self.image.shape) > 2:
+            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = self.image.copy()
+            
+        # Apply thresholding if needed
+        if gray.dtype != np.uint8 or np.max(gray) != 255 or np.min(gray) != 0:
+            _, gray = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+            
+        # Create kernel based on shape
+        if kernel_shape == 'rect':
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
+        elif kernel_shape == 'ellipse':
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+        elif kernel_shape == 'cross':
+            kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (kernel_size, kernel_size))
+        else:
+            raise ValueError("Unknown kernel shape. Use 'rect', 'ellipse', or 'cross'.")
+            
+        # Apply selected operation
+        if operation == 'erode':
+            result = cv2.erode(gray, kernel, iterations=iterations)
+        elif operation == 'dilate':
+            result = cv2.dilate(gray, kernel, iterations=iterations)
+        elif operation == 'open':
+            result = cv2.morphologyEx(gray, cv2.MORPH_OPEN, kernel, iterations=iterations)
+        elif operation == 'close':
+            result = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, kernel, iterations=iterations)
+        elif operation == 'gradient':
+            result = cv2.morphologyEx(gray, cv2.MORPH_GRADIENT, kernel)
+        elif operation == 'tophat':
+            result = cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, kernel)
+        elif operation == 'blackhat':
+            result = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel)
+        else:
+            raise ValueError("Unknown operation. Use 'erode', 'dilate', 'open', 'close', 'gradient', 'tophat', or 'blackhat'.")
+            
+        return result
+        
+    def enhance_segmentation_with_morphology(self, segmentation_method='threshold', morphology_operations=None, **kwargs):
+        """
+        Enhances segmentation results using a sequence of morphological operations.
+        
+        Args:
+            segmentation_method (str): Method for initial segmentation ('threshold', 'otsu', 'adaptive').
+            morphology_operations (list): List of dicts with operations to apply in sequence,
+                                        e.g., [{'op': 'open', 'kernel_size': 5}, {'op': 'dilate', 'kernel_size': 3}]
+            **kwargs: Additional parameters for segmentation.
+            
+        Returns:
+            np.ndarray: The enhanced segmentation result.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        # Convert to grayscale
+        if len(self.image.shape) > 2:
+            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = self.image.copy()
+            
+        # Apply initial segmentation
+        if segmentation_method == 'threshold':
+            threshold_value = kwargs.get('threshold_value', 127)
+            _, segmented = cv2.threshold(gray, threshold_value, 255, cv2.THRESH_BINARY)
+        elif segmentation_method == 'otsu':
+            _, segmented = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        elif segmentation_method == 'adaptive':
+            block_size = kwargs.get('block_size', 11)
+            c = kwargs.get('c', 2)
+            segmented = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                             cv2.THRESH_BINARY, block_size, c)
+        else:
+            raise ValueError("Unknown segmentation method. Use 'threshold', 'otsu', or 'adaptive'.")
+            
+        # If no morphological operations specified, return the segmented image
+        if not morphology_operations:
+            return segmented
+            
+        # Apply morphological operations in sequence
+        result = segmented.copy()
+        for operation in morphology_operations:
+            op_type = operation.get('op', 'open')
+            kernel_size = operation.get('kernel_size', 5)
+            iterations = operation.get('iterations', 1)
+            kernel_shape = operation.get('kernel_shape', 'rect')
+            
+            # Create kernel
+            if kernel_shape == 'rect':
+                kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
+            elif kernel_shape == 'ellipse':
+                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+            elif kernel_shape == 'cross':
+                kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (kernel_size, kernel_size))
+            else:
+                kernel = np.ones((kernel_size, kernel_size), np.uint8)
+                
+            # Apply operation
+            if op_type == 'erode':
+                result = cv2.erode(result, kernel, iterations=iterations)
+            elif op_type == 'dilate':
+                result = cv2.dilate(result, kernel, iterations=iterations)
+            elif op_type == 'open':
+                result = cv2.morphologyEx(result, cv2.MORPH_OPEN, kernel, iterations=iterations)
+            elif op_type == 'close':
+                result = cv2.morphologyEx(result, cv2.MORPH_CLOSE, kernel, iterations=iterations)
+            elif op_type == 'gradient':
+                result = cv2.morphologyEx(result, cv2.MORPH_GRADIENT, kernel)
+            elif op_type == 'tophat':
+                result = cv2.morphologyEx(result, cv2.MORPH_TOPHAT, kernel)
+            elif op_type == 'blackhat':
+                result = cv2.morphologyEx(result, cv2.MORPH_BLACKHAT, kernel)
+                
+        return result
+        
+    def remove_noise_with_morphology(self, kernel_size=3, noise_type='salt_pepper'):
+        """
+        Uses morphological operations to remove specific types of noise.
+        
+        Args:
+            kernel_size (int): Size of the structuring element.
+            noise_type (str): Type of noise to remove ('salt_pepper', 'speckle', 'small_holes').
+            
+        Returns:
+            np.ndarray: The denoised image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        # Convert to grayscale if image is color
+        if len(self.image.shape) > 2:
+            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = self.image.copy()
+            
+        # Apply thresholding to ensure binary image
+        _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+        
+        # Create kernel
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        
+        # Apply specific noise removal
+        if noise_type == 'salt_pepper':
+            # For salt and pepper noise, opening removes salt noise, closing removes pepper noise
+            result = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)  # Remove salt
+            result = cv2.morphologyEx(result, cv2.MORPH_CLOSE, kernel)  # Remove pepper
+        elif noise_type == 'speckle':
+            # For speckle noise, opening is effective
+            result = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+        elif noise_type == 'small_holes':
+            # For small holes, closing is effective
+            result = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+        else:
+            raise ValueError("Unknown noise type. Use 'salt_pepper', 'speckle', or 'small_holes'.")
+            
+        return result
+        
+    def extract_boundaries_with_morphology(self, kernel_size=3):
+        """
+        Extracts object boundaries using morphological operations.
+        
+        Args:
+            kernel_size (int): Size of the structuring element.
+            
+        Returns:
+            np.ndarray: Image with extracted boundaries.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        # Convert to grayscale if image is color
+        if len(self.image.shape) > 2:
+            gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = self.image.copy()
+            
+        # Apply thresholding to ensure binary image
+        _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+        
+        # Create kernel
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        
+        # Dilate the binary image
+        dilation = cv2.dilate(binary, kernel, iterations=1)
+        
+        # Subtract the binary image from its dilation to get the boundaries
+        boundaries = cv2.subtract(dilation, binary)
+        
+        return boundaries
+        
+    def skeletonize_image(self):
+        """
+        Creates a skeleton of a binary image using morphological operations.
+        
+        Returns:
+            np.ndarray: The skeletonized image.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        # Convert to grayscale if image is color
+        if len(self.image.shape) > 2:
+            img = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        else:
+            img = self.image.copy()
+            
+        # Ensure binary image
+        _, img = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+        
+        # Skeletonization algorithm
+        skeleton = np.zeros(img.shape, np.uint8)
+        element = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
+        
+        while True:
+            # Step 1: Open the image
+            eroded = cv2.erode(img, element)
+            opened = cv2.dilate(eroded, element)
+            
+            # Step 2: Subtract the opened image from the original
+            temp = cv2.subtract(img, opened)
+            
+            # Step 3: Add the temporary image to the skeleton
+            skeleton = cv2.bitwise_or(skeleton, temp)
+            
+            # Step 4: Erode the original image
+            img = eroded.copy()
+            
+            # Step 5: If the eroded image is empty, we're done
+            if cv2.countNonZero(img) == 0:
+                break
+                
+        return skeleton

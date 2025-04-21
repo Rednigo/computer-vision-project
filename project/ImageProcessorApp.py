@@ -100,6 +100,10 @@ class ImageProcessorApp:
         geometric_tab = ttk.Frame(processing_tabs)
         processing_tabs.add(geometric_tab, text="Geometric")
         
+        # Tab for morphological operations (Week 8)
+        morphology_tab = ttk.Frame(processing_tabs)
+        processing_tabs.add(morphology_tab, text="Morphology")
+        
         # Segmentation controls
         segmentation_methods = ["Denoise", "Sharpen", "Threshold Segmentation", 
                               "Otsu Segmentation", "Watershed Segmentation", "GrabCut Segmentation"]
@@ -135,6 +139,54 @@ class ImageProcessorApp:
         geometric_btn = ttk.Button(geometric_tab, text="Apply", 
                                  command=lambda: self.process_image('geometric'))
         geometric_btn.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
+        
+        # Morphological operations controls (Week 8)
+        morphology_methods = ["Erosion", "Dilation", "Opening", "Closing", 
+                             "Morphological Gradient", "Top Hat", "Black Hat", 
+                             "Enhanced Segmentation", "Remove Noise", "Extract Boundaries", 
+                             "Skeletonize"]
+        
+        self.morphology_combobox = ttk.Combobox(morphology_tab, values=morphology_methods)
+        self.morphology_combobox.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+        self.morphology_combobox.set("Select Morphological Operation")
+        
+        # Kernel size slider for morphological operations
+        ttk.Label(morphology_tab, text="Kernel Size:").grid(row=1, column=0, padx=5, pady=2, sticky="w")
+        self.kernel_size_var = tk.IntVar(value=5)
+        kernel_slider = ttk.Scale(
+            morphology_tab, 
+            from_=1, 
+            to=21, 
+            orient="horizontal", 
+            variable=self.kernel_size_var,
+            command=lambda val: self.kernel_size_var.set(int(float(val)) if int(float(val)) % 2 != 0 else int(float(val)) + 1)
+        )
+        kernel_slider.grid(row=1, column=1, padx=5, pady=2, sticky="ew")
+        ttk.Label(morphology_tab, textvariable=self.kernel_size_var).grid(row=1, column=2, padx=5, pady=2)
+        
+        # Iterations slider for morphological operations
+        ttk.Label(morphology_tab, text="Iterations:").grid(row=2, column=0, padx=5, pady=2, sticky="w")
+        self.iterations_var = tk.IntVar(value=1)
+        iterations_slider = ttk.Scale(
+            morphology_tab, 
+            from_=1, 
+            to=10, 
+            orient="horizontal", 
+            variable=self.iterations_var
+        )
+        iterations_slider.grid(row=2, column=1, padx=5, pady=2, sticky="ew")
+        ttk.Label(morphology_tab, textvariable=self.iterations_var).grid(row=2, column=2, padx=5, pady=2)
+        
+        # Kernel shape selection for morphological operations
+        ttk.Label(morphology_tab, text="Kernel Shape:").grid(row=3, column=0, padx=5, pady=2, sticky="w")
+        self.kernel_shape_var = tk.StringVar(value="rect")
+        kernel_shapes = ["rect", "ellipse", "cross"]
+        kernel_shape_combobox = ttk.Combobox(morphology_tab, values=kernel_shapes, textvariable=self.kernel_shape_var, width=10)
+        kernel_shape_combobox.grid(row=3, column=1, padx=5, pady=2, sticky="ew")
+        
+        morphology_btn = ttk.Button(morphology_tab, text="Apply", 
+                                  command=lambda: self.process_image('morphology'))
+        morphology_btn.grid(row=4, column=0, columnspan=3, padx=5, pady=5, sticky="ew")
         
         # Reset button
         reset_btn = ttk.Button(left_panel, text="Reset Image", command=self.reset_image)
@@ -550,6 +602,90 @@ class ImageProcessorApp:
             else:
                 messagebox.showerror("Error", "Invalid geometric transform")
                 return
+                
+        elif process_type == 'morphology':
+            action = self.morphology_combobox.get()
+            kernel_size = self.kernel_size_var.get()
+            iterations = self.iterations_var.get()
+            kernel_shape = self.kernel_shape_var.get()
+            
+            try:
+                if action == "Erosion":
+                    result_image = self.image_loader.apply_erosion(kernel_size=kernel_size, iterations=iterations)
+                    
+                elif action == "Dilation":
+                    result_image = self.image_loader.apply_dilation(kernel_size=kernel_size, iterations=iterations)
+                    
+                elif action == "Opening":
+                    result_image = self.image_loader.apply_opening(kernel_size=kernel_size, iterations=iterations)
+                    
+                elif action == "Closing":
+                    result_image = self.image_loader.apply_closing(kernel_size=kernel_size, iterations=iterations)
+                    
+                elif action == "Morphological Gradient":
+                    result_image = self.image_loader.apply_morphological_gradient(kernel_size=kernel_size)
+                    
+                elif action == "Top Hat":
+                    result_image = self.image_loader.apply_top_hat(kernel_size=kernel_size)
+                    
+                elif action == "Black Hat":
+                    result_image = self.image_loader.apply_black_hat(kernel_size=kernel_size)
+                    
+                elif action == "Enhanced Segmentation":
+                    # Configure enhanced segmentation
+                    segmentation_methods = ["threshold", "otsu", "adaptive"]
+                    segmentation_method = simpledialog.askstring(
+                        "Segmentation Method", 
+                        "Enter segmentation method (threshold, otsu, adaptive):",
+                        initialvalue="otsu"
+                    )
+                    
+                    if not segmentation_method or segmentation_method not in segmentation_methods:
+                        messagebox.showerror("Error", "Invalid segmentation method")
+                        return
+                        
+                    # Define sequence of morphological operations
+                    operations = [
+                        {'op': 'open', 'kernel_size': kernel_size, 'iterations': 1, 'kernel_shape': kernel_shape},
+                        {'op': 'close', 'kernel_size': kernel_size, 'iterations': 1, 'kernel_shape': kernel_shape}
+                    ]
+                    
+                    result_image = self.image_loader.enhance_segmentation_with_morphology(
+                        segmentation_method=segmentation_method,
+                        morphology_operations=operations
+                    )
+                    
+                elif action == "Remove Noise":
+                    noise_types = ["salt_pepper", "speckle", "small_holes"]
+                    noise_type = simpledialog.askstring(
+                        "Noise Type",
+                        "Enter noise type (salt_pepper, speckle, small_holes):",
+                        initialvalue="salt_pepper"
+                    )
+                    
+                    if not noise_type or noise_type not in noise_types:
+                        messagebox.showerror("Error", "Invalid noise type")
+                        return
+                        
+                    result_image = self.image_loader.remove_noise_with_morphology(
+                        kernel_size=kernel_size,
+                        noise_type=noise_type
+                    )
+                    
+                elif action == "Extract Boundaries":
+                    result_image = self.image_loader.extract_boundaries_with_morphology(kernel_size=kernel_size)
+                    
+                elif action == "Skeletonize":
+                    result_image = self.image_loader.skeletonize_image()
+                    
+                else:
+                    messagebox.showerror("Error", "Invalid morphological operation")
+                    return
+                    
+            except Exception as e:
+                messagebox.showerror("Error", f"Morphological operation failed: {str(e)}")
+                return
+                
         else:
             messagebox.showerror("Error", "Invalid process type")
             return
