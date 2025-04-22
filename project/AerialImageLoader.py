@@ -5,6 +5,7 @@ import glob
 from tkinter import Tk, filedialog
 from pathlib import Path
 import matplotlib.pyplot as plt
+from ObjectClassifier import ObjectClassifier
 
 class AerialImageLoader:
     """
@@ -25,6 +26,8 @@ class AerialImageLoader:
 
         if image_dir and os.path.exists(image_dir):
             self._load_images_from_directory()
+
+        self.classifier = ObjectClassifier()
 
     def _load_images_from_directory(self):
         """Loads paths to all images from the specified directory."""
@@ -324,6 +327,90 @@ class AerialImageLoader:
         image_with_contours = self.image.copy()
         cv2.drawContours(image_with_contours, contours, -1, (0, 255, 0), 2)
         return image_with_contours
+
+    def train_classifier(self, dataset_dir, model_type='SVM', feature_method='HOG'):
+        """
+        Trains a classifier on a dataset of images.
+        
+        Args:
+            dataset_dir (str): Directory containing the dataset. The directory should have subdirectories,
+                              each named after a class and containing images of that class.
+            model_type (str): Type of classifier to train ('SVM', 'RandomForest', 'KNN').
+            feature_method (str): Method for feature extraction ('HOG', 'SIFT', 'ORB').
+            
+        Returns:
+            tuple: (accuracy, report) - accuracy score and classification report of the trained model.
+        """
+        self.classifier.set_feature_extractor(feature_method)
+        images, labels = self.classifier.create_dataset_from_directory(dataset_dir)
+        
+        if not images:
+            raise ValueError("No images found in the dataset directory")
+            
+        accuracy, report = self.classifier.train(images, labels, model_type)
+        return accuracy, report
+    
+    def classify_image(self):
+        """
+        Classifies the loaded image using the trained classifier.
+        
+        Returns:
+            tuple: (predicted_class, confidence) - predicted class and confidence score.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        if self.classifier.model is None:
+            raise ValueError("No classifier model has been trained yet")
+            
+        return self.classifier.predict(self.image)
+    
+    def load_classifier_model(self, model_path):
+        """
+        Loads a trained classifier model from a file.
+        
+        Args:
+            model_path (str): Path to the saved model file.
+        """
+        self.classifier.load_model(model_path)
+    
+    def save_classifier_model(self, model_path):
+        """
+        Saves the trained classifier model to a file.
+        
+        Args:
+            model_path (str): Path to save the model file.
+        """
+        self.classifier.save_model(model_path)
+    
+    def draw_classification_result(self, predicted_class, confidence=None):
+        """
+        Draws the classification result on the image.
+        
+        Args:
+            predicted_class (str): Predicted class name.
+            confidence (float, optional): Confidence score of the prediction.
+            
+        Returns:
+            np.ndarray: Image with classification result drawn on it.
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+            
+        result_image = self.image.copy()
+        
+        # Draw a box at the top of the image
+        height, width = result_image.shape[:2]
+        cv2.rectangle(result_image, (0, 0), (width, 40), (0, 0, 0), -1)
+        
+        # Draw the class name
+        text = f"Class: {predicted_class}"
+        if confidence is not None:
+            text += f" (Conf: {confidence:.2f})"
+            
+        cv2.putText(result_image, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        return result_image
 
     def detect_features(self, method='SIFT'):
         """

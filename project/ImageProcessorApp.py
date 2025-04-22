@@ -10,6 +10,7 @@ import numpy as np
 
 from AerialImageLoader import AerialImageLoader
 from VideoProcessor import VideoProcessor
+from ObjectClassifier import ObjectClassifier
 
 class ImageProcessorApp:
     def __init__(self, root):
@@ -104,6 +105,10 @@ class ImageProcessorApp:
         morphology_tab = ttk.Frame(processing_tabs)
         processing_tabs.add(morphology_tab, text="Morphology")
         
+        # Tab for object classification (Week 9)
+        classification_tab = ttk.Frame(processing_tabs)
+        processing_tabs.add(classification_tab, text="Classification")
+        
         # Segmentation controls
         segmentation_methods = ["Denoise", "Sharpen", "Threshold Segmentation", 
                               "Otsu Segmentation", "Watershed Segmentation", "GrabCut Segmentation"]
@@ -188,6 +193,35 @@ class ImageProcessorApp:
                                   command=lambda: self.process_image('morphology'))
         morphology_btn.grid(row=4, column=0, columnspan=3, padx=5, pady=5, sticky="ew")
         
+        # Classification controls (Week 9)
+        # Model selection
+        ttk.Label(classification_tab, text="Model Type:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.model_var = tk.StringVar(value="SVM")
+        model_types = ["SVM", "RandomForest", "KNN"]
+        model_combobox = ttk.Combobox(classification_tab, values=model_types, textvariable=self.model_var, width=15)
+        model_combobox.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        
+        # Feature extractor selection
+        ttk.Label(classification_tab, text="Feature Extractor:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        self.feature_extractor_var = tk.StringVar(value="HOG")
+        feature_extractors = ["HOG", "SIFT", "ORB"]
+        feature_extractor_combobox = ttk.Combobox(classification_tab, values=feature_extractors, textvariable=self.feature_extractor_var, width=15)
+        feature_extractor_combobox.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        
+        # Training buttons
+        train_btn = ttk.Button(classification_tab, text="Train Model", command=self.train_classifier)
+        train_btn.grid(row=2, column=0, padx=5, pady=5, sticky="ew")
+        
+        classify_btn = ttk.Button(classification_tab, text="Classify Image", command=self.classify_image)
+        classify_btn.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+        
+        # Load/save model buttons
+        load_model_btn = ttk.Button(classification_tab, text="Load Model", command=self.load_classifier_model)
+        load_model_btn.grid(row=3, column=0, padx=5, pady=5, sticky="ew")
+        
+        save_model_btn = ttk.Button(classification_tab, text="Save Model", command=self.save_classifier_model)
+        save_model_btn.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
+        
         # Reset button
         reset_btn = ttk.Button(left_panel, text="Reset Image", command=self.reset_image)
         reset_btn.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
@@ -202,6 +236,14 @@ class ImageProcessorApp:
         
         self.canvas = tk.Canvas(self.canvas_frame, bg="lightgray")
         self.canvas.pack(fill=tk.BOTH, expand=True)
+        
+        # Status bar for classification results
+        self.status_frame = ttk.Frame(right_panel)
+        self.status_frame.pack(fill=tk.X, expand=False, pady=5)
+        
+        self.status_var = tk.StringVar(value="Ready")
+        status_label = ttk.Label(self.status_frame, textvariable=self.status_var, anchor="w")
+        status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
         # Bind canvas events for point selection (for perspective transform)
         self.canvas.bind("<Button-1>", self.on_canvas_click)
@@ -335,6 +377,135 @@ class ImageProcessorApp:
             self.stop_video()
             self.reset_video()
 
+    # Classification-related methods
+    def train_classifier(self):
+        """Train classifier on a dataset"""
+        if not hasattr(self.image_loader, 'classifier'):
+            messagebox.showerror("Error", "Classifier not available in AerialImageLoader")
+            return
+            
+        # Get dataset directory from user
+        dataset_dir = filedialog.askdirectory(title="Select Dataset Directory")
+        if not dataset_dir:
+            return
+            
+        # Get model and feature extractor types
+        model_type = self.model_var.get()
+        feature_method = self.feature_extractor_var.get()
+        
+        # Update status
+        self.status_var.set(f"Training {model_type} model with {feature_method} features...")
+        self.root.update()
+        
+        try:
+            # Train classifier
+            accuracy, report = self.image_loader.train_classifier(
+                dataset_dir, 
+                model_type=model_type, 
+                feature_method=feature_method
+            )
+            
+            # Show results
+            result_dialog = ClassifierResultDialog(self.root, 
+                                               model_type=model_type,
+                                               feature_method=feature_method,
+                                               accuracy=accuracy,
+                                               report=report)
+            
+            # Update status
+            self.status_var.set(f"Model trained: {model_type} (Accuracy: {accuracy:.2f})")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Training failed: {str(e)}")
+            self.status_var.set("Training failed")
+    
+    def classify_image(self):
+        """Classify the current image"""
+        if self.current_image is None:
+            messagebox.showerror("Error", "No image selected")
+            return
+            
+        if not hasattr(self.image_loader, 'classifier') or self.image_loader.classifier.model is None:
+            messagebox.showerror("Error", "No trained model available")
+            return
+            
+        try:
+            # Classify image
+            predicted_class, confidence = self.image_loader.classify_image()
+            
+            # Display result on image
+            result_image = self.image_loader.draw_classification_result(predicted_class, confidence)
+            self.current_image = result_image
+            self.display_image(result_image)
+            
+            # Update status
+            conf_str = f" (Confidence: {confidence:.2f})" if confidence is not None else ""
+            self.status_var.set(f"Classification result: {predicted_class}{conf_str}")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Classification failed: {str(e)}")
+            self.status_var.set("Classification failed")
+    
+    def load_classifier_model(self):
+        """Load a trained classifier model"""
+        if not hasattr(self.image_loader, 'classifier'):
+            messagebox.showerror("Error", "Classifier not available in AerialImageLoader")
+            return
+            
+        # Get model file from user
+        model_path = filedialog.askopenfilename(
+            title="Load Model",
+            filetypes=[("Pickle Files", "*.pkl"), ("All Files", "*.*")]
+        )
+        
+        if not model_path:
+            return
+            
+        try:
+            # Load model
+            self.image_loader.load_classifier_model(model_path)
+            
+            # Update UI
+            if hasattr(self.image_loader.classifier, 'model_type'):
+                self.model_var.set(self.image_loader.classifier.model_type)
+                
+            if hasattr(self.image_loader.classifier, 'feature_extractor'):
+                self.feature_extractor_var.set(self.image_loader.classifier.feature_extractor)
+                
+            # Update status
+            self.status_var.set(f"Model loaded from: {os.path.basename(model_path)}")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load model: {str(e)}")
+            self.status_var.set("Model loading failed")
+    
+    def save_classifier_model(self):
+        """Save the trained classifier model"""
+        if not hasattr(self.image_loader, 'classifier') or self.image_loader.classifier.model is None:
+            messagebox.showerror("Error", "No trained model to save")
+            return
+            
+        # Get save path from user
+        model_path = filedialog.asksaveasfilename(
+            title="Save Model",
+            defaultextension=".pkl",
+            filetypes=[("Pickle Files", "*.pkl"), ("All Files", "*.*")]
+        )
+        
+        if not model_path:
+            return
+            
+        try:
+            # Save model
+            self.image_loader.save_classifier_model(model_path)
+            
+            # Update status
+            self.status_var.set(f"Model saved to: {os.path.basename(model_path)}")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save model: {str(e)}")
+            self.status_var.set("Model saving failed")
+
     def load_images(self):
         self.image_paths = filedialog.askopenfilenames(
             title="Select Images", 
@@ -417,90 +588,6 @@ class ImageProcessorApp:
                     text=str(i+1), 
                     fill='red'
                 )
-
-    def on_canvas_click(self, event):
-        """Handle canvas clicks for point selection."""
-        if not self.is_selecting_points or self.current_image is None:
-            return
-            
-        # Get canvas dimensions
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
-        
-        # Get image dimensions
-        img_height, img_width = self.current_image.shape[:2]
-        
-        # Calculate scaling factor and offsets
-        scale = min(canvas_width/img_width, canvas_height/img_height)
-        new_width = int(img_width * scale)
-        new_height = int(img_height * scale)
-        
-        x_offset = (canvas_width - new_width) / 2
-        y_offset = (canvas_height - new_height) / 2
-        
-        # Convert canvas coordinates to image coordinates
-        if (x_offset <= event.x <= x_offset + new_width and 
-            y_offset <= event.y <= y_offset + new_height):
-            
-            # Convert to original image coordinates
-            orig_x = int((event.x - x_offset) / scale)
-            orig_y = int((event.y - y_offset) / scale)
-            
-            # Add point
-            if len(self.perspective_points) < 4:
-                self.perspective_points.append((orig_x, orig_y))
-                
-                # Redisplay image with points
-                self.display_image(self.current_image)
-                
-                # If we have enough points, process the transform
-                if len(self.perspective_points) == 4 and self.is_selecting_points:
-                    self.apply_perspective_transform()
-
-    def apply_perspective_transform(self):
-        """Apply perspective transform using the selected points."""
-        if len(self.perspective_points) != 4:
-            messagebox.showerror("Error", "Please select exactly 4 points")
-            return
-            
-        # Get image dimensions
-        height, width = self.current_image.shape[:2]
-        
-        # Define destination points (rectangle)
-        # Sort points to ensure consistent order: top-left, top-right, bottom-right, bottom-left
-        src_points = np.array(self.perspective_points, dtype=np.float32)
-        
-        # Calculate destination points based on the dimensions of the selected quadrilateral
-        # Find the width and height of the selected quadrilateral
-        width_top = np.sqrt(((src_points[1][0] - src_points[0][0]) ** 2) + 
-                           ((src_points[1][1] - src_points[0][1]) ** 2))
-        width_bottom = np.sqrt(((src_points[2][0] - src_points[3][0]) ** 2) + 
-                              ((src_points[2][1] - src_points[3][1]) ** 2))
-        width_max = max(int(width_top), int(width_bottom))
-        
-        height_left = np.sqrt(((src_points[3][0] - src_points[0][0]) ** 2) + 
-                             ((src_points[3][1] - src_points[0][1]) ** 2))
-        height_right = np.sqrt(((src_points[2][0] - src_points[1][0]) ** 2) + 
-                              ((src_points[2][1] - src_points[1][1]) ** 2))
-        height_max = max(int(height_left), int(height_right))
-        
-        dst_points = np.array([
-            [0, 0],               # top-left
-            [width_max - 1, 0],   # top-right
-            [width_max - 1, height_max - 1],  # bottom-right
-            [0, height_max - 1]   # bottom-left
-        ], dtype=np.float32)
-        
-        # Apply perspective transform
-        try:
-            self.current_image = self.image_loader.perspective_transform(src_points, dst_points)
-            self.display_image(self.current_image)
-        except Exception as e:
-            messagebox.showerror("Error", f"Perspective transform failed: {str(e)}")
-        
-        # Reset selection state
-        self.is_selecting_points = False
-        self.perspective_points = []
 
     def process_image(self, process_type):
         """Process the current image based on the selected method."""
@@ -686,6 +773,18 @@ class ImageProcessorApp:
                 messagebox.showerror("Error", f"Morphological operation failed: {str(e)}")
                 return
                 
+        # Classification процес можна додати тут, якщо необхідно обробити зображення перед класифікацією
+        elif process_type == 'classification':
+            try:
+                # Отримання результатів класифікації
+                predicted_class, confidence = self.image_loader.classify_image()
+                
+                # Відображення результатів на зображенні
+                result_image = self.image_loader.draw_classification_result(predicted_class, confidence)
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Classification failed: {str(e)}")
+                return
         else:
             messagebox.showerror("Error", "Invalid process type")
             return
@@ -723,6 +822,90 @@ class ImageProcessorApp:
                 messagebox.showinfo("Success", f"Image saved to {file_path}")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save image: {str(e)}")
+
+    def on_canvas_click(self, event):
+        """Handle canvas clicks for point selection."""
+        if not self.is_selecting_points or self.current_image is None:
+            return
+            
+        # Get canvas dimensions
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        
+        # Get image dimensions
+        img_height, img_width = self.current_image.shape[:2]
+        
+        # Calculate scaling factor and offsets
+        scale = min(canvas_width/img_width, canvas_height/img_height)
+        new_width = int(img_width * scale)
+        new_height = int(img_height * scale)
+        
+        x_offset = (canvas_width - new_width) / 2
+        y_offset = (canvas_height - new_height) / 2
+        
+        # Convert canvas coordinates to image coordinates
+        if (x_offset <= event.x <= x_offset + new_width and 
+            y_offset <= event.y <= y_offset + new_height):
+            
+            # Convert to original image coordinates
+            orig_x = int((event.x - x_offset) / scale)
+            orig_y = int((event.y - y_offset) / scale)
+            
+            # Add point
+            if len(self.perspective_points) < 4:
+                self.perspective_points.append((orig_x, orig_y))
+                
+                # Redisplay image with points
+                self.display_image(self.current_image)
+                
+                # If we have enough points, process the transform
+                if len(self.perspective_points) == 4 and self.is_selecting_points:
+                    self.apply_perspective_transform()
+
+    def apply_perspective_transform(self):
+        """Apply perspective transform using the selected points."""
+        if len(self.perspective_points) != 4:
+            messagebox.showerror("Error", "Please select exactly 4 points")
+            return
+            
+        # Get image dimensions
+        height, width = self.current_image.shape[:2]
+        
+        # Define destination points (rectangle)
+        # Sort points to ensure consistent order: top-left, top-right, bottom-right, bottom-left
+        src_points = np.array(self.perspective_points, dtype=np.float32)
+        
+        # Calculate destination points based on the dimensions of the selected quadrilateral
+        # Find the width and height of the selected quadrilateral
+        width_top = np.sqrt(((src_points[1][0] - src_points[0][0]) ** 2) + 
+                           ((src_points[1][1] - src_points[0][1]) ** 2))
+        width_bottom = np.sqrt(((src_points[2][0] - src_points[3][0]) ** 2) + 
+                              ((src_points[2][1] - src_points[3][1]) ** 2))
+        width_max = max(int(width_top), int(width_bottom))
+        
+        height_left = np.sqrt(((src_points[3][0] - src_points[0][0]) ** 2) + 
+                             ((src_points[3][1] - src_points[0][1]) ** 2))
+        height_right = np.sqrt(((src_points[2][0] - src_points[1][0]) ** 2) + 
+                              ((src_points[2][1] - src_points[1][1]) ** 2))
+        height_max = max(int(height_left), int(height_right))
+        
+        dst_points = np.array([
+            [0, 0],               # top-left
+            [width_max - 1, 0],   # top-right
+            [width_max - 1, height_max - 1],  # bottom-right
+            [0, height_max - 1]   # bottom-left
+        ], dtype=np.float32)
+        
+        # Apply perspective transform
+        try:
+            self.current_image = self.image_loader.perspective_transform(src_points, dst_points)
+            self.display_image(self.current_image)
+        except Exception as e:
+            messagebox.showerror("Error", f"Perspective transform failed: {str(e)}")
+        
+        # Reset selection state
+        self.is_selecting_points = False
+        self.perspective_points = []
 
     def load_video(self):
         video_paths = filedialog.askopenfilenames(
@@ -951,6 +1134,63 @@ class ImageProcessorApp:
         
         # Destroy root window
         self.root.destroy()
+
+
+class ClassifierResultDialog(tk.Toplevel):
+    """Dialog to display classifier training results."""
+    def __init__(self, parent, model_type, feature_method, accuracy, report):
+        super().__init__(parent)
+        self.title("Classifier Training Results")
+        self.geometry("500x400")
+        self.resizable(True, True)
+        
+        # Main frame
+        frame = ttk.Frame(self, padding="10")
+        frame.pack(fill="both", expand=True)
+        
+        # Model info
+        info_frame = ttk.LabelFrame(frame, text="Model Information")
+        info_frame.pack(fill="x", expand=False, pady=5)
+        
+        ttk.Label(info_frame, text=f"Model Type: {model_type}").pack(anchor="w", padx=5, pady=2)
+        ttk.Label(info_frame, text=f"Feature Extractor: {feature_method}").pack(anchor="w", padx=5, pady=2)
+        ttk.Label(info_frame, text=f"Accuracy: {accuracy:.4f}").pack(anchor="w", padx=5, pady=2)
+        
+        # Classification report
+        report_frame = ttk.LabelFrame(frame, text="Classification Report")
+        report_frame.pack(fill="both", expand=True, pady=5)
+        
+        # Text widget for the report
+        report_text = tk.Text(report_frame, wrap="none", height=15)
+        report_text.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        
+        # Scrollbars
+        y_scrollbar = ttk.Scrollbar(report_frame, orient="vertical", command=report_text.yview)
+        y_scrollbar.pack(side="right", fill="y")
+        
+        x_scrollbar = ttk.Scrollbar(frame, orient="horizontal", command=report_text.xview)
+        x_scrollbar.pack(fill="x")
+        
+        report_text.config(yscrollcommand=y_scrollbar.set, xscrollcommand=x_scrollbar.set)
+        
+        # Insert the report
+        report_text.insert("1.0", report)
+        report_text.config(state="disabled")  # Make read-only
+        
+        # Close button
+        ttk.Button(frame, text="Close", command=self.destroy).pack(pady=10)
+        
+        # Make dialog modal
+        self.transient(parent)
+        self.grab_set()
+        
+        # Center the dialog
+        self.update_idletasks()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        x = (parent.winfo_width() // 2) - (width // 2) + parent.winfo_x()
+        y = (parent.winfo_height() // 2) - (height // 2) + parent.winfo_y()
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
 
 class CropDialog(tk.Toplevel):
