@@ -1237,6 +1237,138 @@ class ImageProcessorApp:
         view_results_btn = ttk.Button(testing_buttons_frame, text="View Results", 
                                     command=self.view_test_results)
         view_results_btn.pack(side=tk.LEFT, padx=5, pady=5)
+
+        # Tab for practical applications (Week 14)
+        practical_tab = ttk.Frame(processing_tabs)
+        processing_tabs.add(practical_tab, text="Practical Applications")
+
+        # Real-time detection section
+        realtime_frame = ttk.LabelFrame(practical_tab, text="Real-time Detection")
+        realtime_frame.pack(fill="x", expand=False, pady=5)
+
+        # Source selection
+        source_frame = ttk.Frame(realtime_frame)
+        source_frame.pack(fill="x", padx=5, pady=5)
+
+        ttk.Label(source_frame, text="Source:").pack(side=tk.LEFT, padx=5)
+        self.rt_source_var = tk.StringVar(value="webcam")
+        source_options = [("Webcam", "webcam"), ("Video File", "file"), ("RTSP Stream", "rtsp")]
+        for text, value in source_options:
+            ttk.Radiobutton(source_frame, text=text, variable=self.rt_source_var, value=value).pack(side=tk.LEFT, padx=5)
+
+        # Source path/URL
+        path_frame = ttk.Frame(realtime_frame)
+        path_frame.pack(fill="x", padx=5, pady=5)
+
+        self.rt_source_path_var = tk.StringVar()
+        ttk.Label(path_frame, text="Path/URL:").pack(side=tk.LEFT, padx=5)
+        source_entry = ttk.Entry(path_frame, textvariable=self.rt_source_path_var, width=50)
+        source_entry.pack(side=tk.LEFT, padx=5)
+        browse_source_btn = ttk.Button(path_frame, text="Browse", command=self.browse_rt_source)
+        browse_source_btn.pack(side=tk.LEFT, padx=5)
+
+        # Model selection for real-time
+        model_frame = ttk.Frame(realtime_frame)
+        model_frame.pack(fill="x", padx=5, pady=5)
+
+        ttk.Label(model_frame, text="Model:").pack(side=tk.LEFT, padx=5)
+        self.rt_model_var = tk.StringVar(value="yolo")
+        rt_models = [("YOLO", "yolo"), ("CNN", "cnn"), ("Traditional ML", "traditional")]
+        for text, value in rt_models:
+            ttk.Radiobutton(model_frame, text=text, variable=self.rt_model_var, value=value).pack(side=tk.LEFT, padx=5)
+
+        # Confidence threshold
+        conf_frame = ttk.Frame(realtime_frame)
+        conf_frame.pack(fill="x", padx=5, pady=5)
+
+        ttk.Label(conf_frame, text="Confidence:").pack(side=tk.LEFT, padx=5)
+        self.rt_confidence_var = tk.DoubleVar(value=0.5)
+        conf_slider = ttk.Scale(conf_frame, from_=0.1, to=0.9, orient="horizontal", 
+                            variable=self.rt_confidence_var, length=200)
+        conf_slider.pack(side=tk.LEFT, padx=5)
+        ttk.Label(conf_frame, textvariable=self.rt_confidence_var).pack(side=tk.LEFT, padx=5)
+
+        # Real-time control buttons
+        rt_buttons_frame = ttk.Frame(realtime_frame)
+        rt_buttons_frame.pack(fill="x", padx=5, pady=5)
+
+        self.start_rt_btn = ttk.Button(rt_buttons_frame, text="Start Detection", command=self.start_realtime_detection)
+        self.start_rt_btn.pack(side=tk.LEFT, padx=5)
+
+        self.stop_rt_btn = ttk.Button(rt_buttons_frame, text="Stop Detection", command=self.stop_realtime_detection, state=tk.DISABLED)
+        self.stop_rt_btn.pack(side=tk.LEFT, padx=5)
+
+        view_rt_stats_btn = ttk.Button(rt_buttons_frame, text="View Statistics", command=self.view_rt_statistics)
+        view_rt_stats_btn.pack(side=tk.LEFT, padx=5)
+
+        # Satellite image analysis section
+        satellite_frame = ttk.LabelFrame(practical_tab, text="Satellite Image Analysis")
+        satellite_frame.pack(fill="x", expand=False, pady=5)
+
+        # Satellite image input
+        sat_input_frame = ttk.Frame(satellite_frame)
+        sat_input_frame.pack(fill="x", padx=5, pady=5)
+
+        self.sat_image_path_var = tk.StringVar()
+        ttk.Label(sat_input_frame, text="Image:").pack(side=tk.LEFT, padx=5)
+        sat_entry = ttk.Entry(sat_input_frame, textvariable=self.sat_image_path_var, width=50)
+        sat_entry.pack(side=tk.LEFT, padx=5)
+        browse_sat_btn = ttk.Button(sat_input_frame, text="Browse", command=self.browse_satellite_image)
+        browse_sat_btn.pack(side=tk.LEFT, padx=5)
+
+        # Analysis parameters
+        sat_params_frame = ttk.Frame(satellite_frame)
+        sat_params_frame.pack(fill="x", padx=5, pady=5)
+
+        # Tile size
+        tile_frame = ttk.Frame(sat_params_frame)
+        tile_frame.grid(row=0, column=0, padx=5, pady=2, sticky="w")
+        ttk.Label(tile_frame, text="Tile Size:").pack(side=tk.LEFT, padx=5)
+        self.tile_size_var = tk.IntVar(value=512)
+        tile_sizes = [256, 512, 1024]
+        tile_combo = ttk.Combobox(tile_frame, values=tile_sizes, textvariable=self.tile_size_var, width=10)
+        tile_combo.pack(side=tk.LEFT, padx=5)
+
+        # Overlap
+        overlap_frame = ttk.Frame(sat_params_frame)
+        overlap_frame.grid(row=0, column=1, padx=5, pady=2, sticky="w")
+        ttk.Label(overlap_frame, text="Overlap:").pack(side=tk.LEFT, padx=5)
+        self.overlap_var = tk.DoubleVar(value=0.2)
+        overlap_slider = ttk.Scale(overlap_frame, from_=0.0, to=0.5, orient="horizontal", 
+                                variable=self.overlap_var, length=150)
+        overlap_slider.pack(side=tk.LEFT, padx=5)
+        ttk.Label(overlap_frame, textvariable=self.overlap_var).pack(side=tk.LEFT, padx=5)
+
+        # Confidence for satellite
+        sat_conf_frame = ttk.Frame(sat_params_frame)
+        sat_conf_frame.grid(row=1, column=0, padx=5, pady=2, sticky="w")
+        ttk.Label(sat_conf_frame, text="Confidence:").pack(side=tk.LEFT, padx=5)
+        self.sat_confidence_var = tk.DoubleVar(value=0.5)
+        sat_conf_slider = ttk.Scale(sat_conf_frame, from_=0.1, to=0.9, orient="horizontal", 
+                                variable=self.sat_confidence_var, length=150)
+        sat_conf_slider.pack(side=tk.LEFT, padx=5)
+        ttk.Label(sat_conf_frame, textvariable=self.sat_confidence_var).pack(side=tk.LEFT, padx=5)
+
+        # Output directory for satellite analysis
+        output_frame = ttk.Frame(satellite_frame)
+        output_frame.pack(fill="x", padx=5, pady=5)
+
+        self.sat_output_dir_var = tk.StringVar()
+        ttk.Label(output_frame, text="Output Directory:").pack(side=tk.LEFT, padx=5)
+        output_entry = ttk.Entry(output_frame, textvariable=self.sat_output_dir_var, width=50)
+        output_entry.pack(side=tk.LEFT, padx=5)
+        browse_output_btn = ttk.Button(output_frame, text="Browse", command=self.browse_sat_output_dir)
+        browse_output_btn.pack(side=tk.LEFT, padx=5)
+
+        # Analysis buttons
+        sat_buttons_frame = ttk.Frame(satellite_frame)
+        sat_buttons_frame.pack(fill="x", padx=5, pady=5)
+
+        analyze_btn = ttk.Button(sat_buttons_frame, text="Analyze Image", command=self.analyze_satellite_image)
+        analyze_btn.pack(side=tk.LEFT, padx=5)
+
+        view_sat_results_btn = ttk.Button(sat_buttons_frame, text="View Results", command=self.view_satellite_results)
+        view_sat_results_btn.pack(side=tk.LEFT, padx=5)
         
         # Reset button
         reset_btn = ttk.Button(left_panel, text="Reset Image", command=self.reset_image)
