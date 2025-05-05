@@ -6,6 +6,8 @@ from tkinter import Tk, filedialog
 from pathlib import Path
 import matplotlib.pyplot as plt
 from ObjectClassifier import ObjectClassifier
+from CNNClassifier import CNNClassifier
+from PreTrainedModels import PreTrainedModels
 
 class AerialImageLoader:
     """
@@ -15,7 +17,7 @@ class AerialImageLoader:
     def __init__(self, image_dir=None):
         """
         Initialize the image loader object.
-
+        
         Args:
             image_dir: Directory with images (optional)
         """
@@ -28,6 +30,10 @@ class AerialImageLoader:
             self._load_images_from_directory()
 
         self.classifier = ObjectClassifier()
+        self.cnn_classifier = CNNClassifier()
+        self.pretrained_models = PreTrainedModels()  # Add this line
+
+
 
     def _load_images_from_directory(self):
         """Loads paths to all images from the specified directory."""
@@ -1084,3 +1090,191 @@ class AerialImageLoader:
                 break
                 
         return skeleton
+def train_cnn_classifier(self, dataset_dir, epochs=50, batch_size=32, validation_split=0.2):
+    """
+    Train CNN classifier on a dataset of images.
+    
+    Args:
+        dataset_dir (str): Directory containing the dataset.
+        epochs (int): Number of training epochs.
+        batch_size (int): Batch size for training.
+        validation_split (float): Fraction of data to use for validation.
+        
+    Returns:
+        history: Training history.
+    """
+    from pathlib import Path
+    
+    # Create dataset from directory
+    dataset_path = Path(dataset_dir)
+    if not dataset_path.exists():
+        raise FileNotFoundError(f"Dataset directory not found: {dataset_dir}")
+    
+    images = []
+    labels = []
+    
+    # Get all class directories
+    class_dirs = [d for d in dataset_path.iterdir() if d.is_dir()]
+    
+    for class_dir in class_dirs:
+        class_name = class_dir.name
+        
+        # Get all image files in the class directory
+        image_files = []
+        for ext in ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tif', '*.tiff']:
+            image_files.extend(list(class_dir.glob(ext)))
+        
+        for image_file in image_files:
+            image = cv2.imread(str(image_file))
+            if image is not None:
+                images.append(image)
+                labels.append(class_name)
+    
+    # Train CNN
+    history = self.cnn_classifier.train(
+        images, 
+        labels, 
+        epochs=epochs, 
+        batch_size=batch_size, 
+        validation_split=validation_split
+    )
+    
+    return history
+
+def classify_image_cnn(self):
+    """
+    Classifies the loaded image using the CNN classifier.
+    
+    Returns:
+        tuple: (predicted_class, confidence) - predicted class and confidence score.
+    """
+    if self.image is None:
+        raise ValueError("No image loaded")
+        
+    if self.cnn_classifier.model is None:
+        raise ValueError("CNN model has not been trained yet")
+        
+    return self.cnn_classifier.predict(self.image)
+
+def load_cnn_model(self, model_path):
+    """
+    Loads a trained CNN classifier model from a file.
+    
+    Args:
+        model_path (str): Path to the saved model file (without .h5 extension).
+    """
+    self.cnn_classifier.load_model(model_path)
+
+def save_cnn_model(self, model_path):
+    """
+    Saves the trained CNN classifier model to a file.
+    
+    Args:
+        model_path (str): Path to save the model file (without .h5 extension).
+    """
+    self.cnn_classifier.save_model(model_path)
+
+def plot_cnn_training_history(self):
+    """
+    Plot the training history of the CNN model.
+    """
+    self.cnn_classifier.plot_training_history()
+
+def get_cnn_summary(self):
+    """
+    Get summary of the CNN model architecture.
+    
+    Returns:
+        summary: Model summary string.
+    """
+    return self.cnn_classifier.get_summary()
+
+def load_resnet(self):
+    """Load ResNet50 model"""
+    self.pretrained_models.load_resnet()
+
+def load_mobilenet(self):
+    """Load MobileNetV2 model"""
+    self.pretrained_models.load_mobilenet()
+
+def load_yolo(self, model_type='yolov8n'):
+    """Load YOLO model"""
+    self.pretrained_models.load_yolo(model_type=model_type)
+
+def create_unet(self, input_size=(256, 256, 3), num_classes=2):
+    """Create U-Net architecture"""
+    return self.pretrained_models.create_unet(input_size=input_size, num_classes=num_classes)
+
+def load_pretrained_unet(self, model_path):
+    """Load pre-trained U-Net model"""
+    self.pretrained_models.load_pretrained_unet(model_path)
+
+def save_unet(self, save_path):
+    """Save U-Net model"""
+    self.pretrained_models.save_unet(save_path)
+
+def predict_with_resnet(self):
+    """Predict using ResNet50"""
+    if self.image_path is None:
+        raise ValueError("No image loaded")
+    
+    return self.pretrained_models.predict_resnet(str(self.image_path))
+
+def predict_with_mobilenet(self):
+    """Predict using MobileNetV2"""
+    if self.image_path is None:
+        raise ValueError("No image loaded")
+    
+    return self.pretrained_models.predict_mobilenet(str(self.image_path))
+
+def detect_with_yolo(self, conf_threshold=0.5):
+    """Detect objects using YOLO"""
+    if self.image_path is None:
+        raise ValueError("No image loaded")
+    
+    detections, annotated_img = self.pretrained_models.detect_yolo(str(self.image_path), conf_threshold)
+    
+    # Update current image with annotated version
+    self.image = annotated_img
+    
+    return detections, annotated_img
+
+def segment_with_unet(self):
+    """Segment image using U-Net"""
+    if self.image_path is None:
+        raise ValueError("No image loaded")
+    
+    mask = self.pretrained_models.segment_unet(str(self.image_path))
+    
+    # Create colored mask
+    colored_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+    colored_mask[mask > 0] = [0, 255, 0]  # Green for mask
+    
+    # Overlay mask on original image
+    orig_img_resized = cv2.resize(self.image, (mask.shape[1], mask.shape[0]))
+    overlaid = cv2.addWeighted(orig_img_resized, 0.7, colored_mask, 0.3, 0)
+    
+    return mask, overlaid
+
+def compare_pretrained_models(self):
+    """Compare predictions from multiple pre-trained models"""
+    if self.image_path is None:
+        raise ValueError("No image loaded")
+    
+    results = self.pretrained_models.compare_models(str(self.image_path))
+    return results
+
+def get_pretrained_model_info(self, model_name):
+    """Get information about a pre-trained model"""
+    return self.pretrained_models.get_model_info(model_name)
+
+def visualize_detections(self, detections, draw_on_current=True):
+    """Visualize detections on current image"""
+    if draw_on_current and self.image is not None:
+        annotated_img = self.pretrained_models.visualize_detections(str(self.image_path), detections)
+        self.image = annotated_img
+        return annotated_img
+    elif self.image_path is not None:
+        return self.pretrained_models.visualize_detections(str(self.image_path), detections)
+    else:
+        raise ValueError("No image available")

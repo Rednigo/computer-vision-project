@@ -262,6 +262,57 @@ class ImageProcessorApp:
         
         save_model_btn = ttk.Button(model_file_frame, text="Save Model", command=self.save_classifier_model)
         save_model_btn.pack(side=tk.LEFT, padx=5, pady=5)
+
+        # Tab for pre-trained models (Week 11)
+        pretrained_tab = ttk.Frame(processing_tabs)
+        processing_tabs.add(pretrained_tab, text="Pre-trained Models")
+
+        # Model selection frame
+        model_selection_frame = ttk.LabelFrame(pretrained_tab, text="Model Selection")
+        model_selection_frame.pack(fill="x", expand=False, pady=5)
+
+        # Model type selection
+        ttk.Label(model_selection_frame, text="Model Type:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.pretrained_model_var = tk.StringVar(value="ResNet50")
+        pretrained_models = ["ResNet50", "MobileNetV2", "YOLOv8", "U-Net"]
+        pretrained_model_combo = ttk.Combobox(model_selection_frame, values=pretrained_models, textvariable=self.pretrained_model_var, width=15)
+        pretrained_model_combo.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+
+        # YOLO model type (only for YOLO)
+        ttk.Label(model_selection_frame, text="YOLO Type:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        self.yolo_type_var = tk.StringVar(value="yolov8n")
+        yolo_types = ["yolov8n", "yolov8s", "yolov8m", "yolov8l", "yolov8x"]
+        yolo_type_combo = ttk.Combobox(model_selection_frame, values=yolo_types, textvariable=self.yolo_type_var, width=15)
+        yolo_type_combo.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+
+        # YOLO confidence threshold
+        ttk.Label(model_selection_frame, text="YOLO Confidence:").grid(row=2, column=0, padx=5, pady=5, sticky="w")
+        self.yolo_conf_var = tk.DoubleVar(value=0.5)
+        yolo_conf_slider = ttk.Scale(
+            model_selection_frame,
+            from_=0.1,
+            to=0.9,
+            orient="horizontal",
+            variable=self.yolo_conf_var
+        )
+        yolo_conf_slider.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+        ttk.Label(model_selection_frame, textvariable=self.yolo_conf_var).grid(row=2, column=2, padx=5, pady=5)
+
+        # Action buttons
+        action_frame = ttk.Frame(pretrained_tab)
+        action_frame.pack(fill="x", expand=False, pady=5)
+
+        load_pretrained_btn = ttk.Button(action_frame, text="Load Model", command=self.load_pretrained_model)
+        load_pretrained_btn.pack(side=tk.LEFT, padx=5, pady=5)
+
+        predict_pretrained_btn = ttk.Button(action_frame, text="Run Prediction", command=self.run_pretrained_prediction)
+        predict_pretrained_btn.pack(side=tk.LEFT, padx=5, pady=5)
+
+        compare_models_btn = ttk.Button(action_frame, text="Compare Models", command=self.compare_pretrained_models)
+        compare_models_btn.pack(side=tk.LEFT, padx=5, pady=5)
+
+        show_model_info_btn = ttk.Button(action_frame, text="Show Model Info", command=self.show_pretrained_model_info)
+        show_model_info_btn.pack(side=tk.LEFT, padx=5, pady=5)
         
         # Reset button
         reset_btn = ttk.Button(left_panel, text="Reset Image", command=self.reset_image)
