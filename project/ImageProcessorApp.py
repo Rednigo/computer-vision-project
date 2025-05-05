@@ -107,6 +107,231 @@ class ImageProcessorApp:
             messagebox.showerror("Error", f"Failed to load model: {str(e)}")
             self.status_var.set("Model loading failed")
 
+    def browse_test_dataset(self):
+        """Browse for test dataset directory"""
+        directory = filedialog.askdirectory(title="Select Test Dataset Directory")
+        if directory:
+            self.test_dataset_path_var.set(directory)
+
+    def browse_test_output_dir(self):
+        """Browse for test output directory"""
+        directory = filedialog.askdirectory(title="Select Output Directory for Test Results")
+        if directory:
+            self.test_output_dir_var.set(directory)
+
+    def run_model_tests(self):
+        """Run comprehensive model testing"""
+        test_dataset_dir = self.test_dataset_path_var.get()
+        output_dir = self.test_output_dir_var.get()
+        
+        if not test_dataset_dir:
+            messagebox.showerror("Error", "Please select test dataset directory")
+            return
+        
+        if not output_dir:
+            messagebox.showerror("Error", "Please select output directory")
+            return
+        
+        try:
+            # Get selected models
+            models_to_test = []
+            for model_type, var in self.test_models.items():
+                if var.get():
+                    models_to_test.append(model_type)
+            
+            if not models_to_test:
+                messagebox.showerror("Error", "Please select at least one model to test")
+                return
+            
+            self.status_var.set("Running model tests...")
+            self.root.update()
+            
+            # Run appropriate testing based on options
+            if self.test_with_error_analysis_var.get():
+                results, error_analysis = self.image_loader.test_with_error_analysis(
+                    test_dataset_dir, output_dir
+                )
+                self.status_var.set("Testing completed with error analysis")
+            else:
+                results = self.image_loader.test_model_performance(
+                    test_dataset_dir, output_dir, models_to_test
+                )
+                self.status_var.set("Testing completed")
+            
+            # Run efficiency comparison if requested
+            if self.efficiency_comparison_var.get():
+                efficiency_metrics = self.image_loader.compare_model_efficiency(
+                    test_dataset_dir, output_dir
+                )
+            
+            # Show summary in dialog
+            self.show_test_summary(results)
+            
+            # Ask if user wants to view detailed results
+            if messagebox.askyesno("Test Complete", 
+                                f"Testing completed! Results saved to:\n{output_dir}\n\nView detailed results now?"):
+                self.view_test_results()
+        
+        except Exception as e:
+            messagebox.showerror("Error", f"Testing failed: {str(e)}")
+            self.status_var.set("Testing failed")
+
+    def show_test_summary(self, results):
+        """Show testing summary dialog"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Model Testing Summary")
+        dialog.geometry("800x600")
+        dialog.resizable(True, True)
+        
+        # Main frame
+        frame = ttk.Frame(dialog, padding="10")
+        frame.pack(fill="both", expand=True)
+        
+        # Create text area with scrollbar
+        text_frame = ttk.Frame(frame)
+        text_frame.pack(fill="both", expand=True)
+        
+        text_widget = tk.Text(text_frame, wrap="word", height=25, width=60)
+        text_widget.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        
+        scrollbar = ttk.Scrollbar(text_frame, orient="vertical", command=text_widget.yview)
+        scrollbar.pack(side="right", fill="y")
+        
+        text_widget.config(yscrollcommand=scrollbar.set)
+        
+        # Format summary text
+        summary_text = "MODEL TESTING SUMMARY\n"
+        summary_text += "=" * 50 + "\n\n"
+        
+        for model_name, model_results in results.items():
+            summary_text += f"{model_name}:\n"
+            summary_text += f"  Accuracy: {model_results['accuracy']:.3f}\n"
+            summary_text += f"  FPS: {model_results['fps']:.2f}\n"
+            summary_text += f"  Test Time: {model_results['test_time']:.2f}s\n"
+            if 'average_confidence' in model_results:
+                summary_text += f"  Avg Confidence: {model_results['average_confidence']:.3f}\n"
+            summary_text += "\n"
+        
+        # Insert text
+        text_widget.insert("1.0", summary_text)
+        text_widget.config(state="disabled")
+        
+        # Close button
+        ttk.Button(frame, text="Close", command=dialog.destroy).pack(pady=10)
+        
+        # Make dialog modal
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Center dialog
+        dialog.update_idletasks()
+        width = dialog.winfo_width()
+        height = dialog.winfo_height()
+        x = (self.root.winfo_width() // 2) - (width // 2) + self.root.winfo_x()
+        y = (self.root.winfo_height() // 2) - (height // 2) + self.root.winfo_y()
+        dialog.geometry(f"{width}x{height}+{x}+{y}")
+
+    def view_test_results(self):
+        """View detailed test results"""
+        output_dir = self.test_output_dir_var.get()
+        
+        if not output_dir:
+            messagebox.showerror("Error", "No test results directory selected")
+            return
+        
+        import os
+        import webbrowser
+        import platform
+        
+        # Create HTML report viewer
+        self.generate_html_report(output_dir)
+        
+        # Open the report
+        report_path = os.path.join(output_dir, "test_report.html")
+        if os.path.exists(report_path):
+            # Open in default browser
+            webbrowser.open(f'file://{os.path.abspath(report_path)}')
+        else:
+            # Fallback: open directory
+            if platform.system() == 'Darwin':  # macOS
+                os.system(f'open "{output_dir}"')
+            elif platform.system() == 'Windows':
+                os.startfile(output_dir)
+            else:  # Linux
+                os.system(f'xdg-open "{output_dir}"')
+
+    def generate_html_report(self, output_dir):
+        """Generate HTML report from test results"""
+        import os
+        from pathlib import Path
+        
+        report_html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Model Testing Report</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                h1 { color: #333; }
+                .section { margin-bottom: 30px; }
+                img { max-width: 100%; height: auto; margin-bottom: 20px; }
+                table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                .performance { display: flex; flex-wrap: wrap; justify-content: space-around; }
+                .performance-item { margin: 10px; }
+            </style>
+        </head>
+        <body>
+            <h1>Aerial Object Recognition Model Testing Report</h1>
+            
+            <div class="section">
+                <h2>Performance Overview</h2>
+                <img src="performance_comparison.png" alt="Performance Comparison">
+            </div>
+            
+            <div class="section">
+                <h2>Timing Analysis</h2>
+                <img src="timing_analysis.png" alt="Timing Analysis">
+            </div>
+            
+            <div class="section">
+                <h2>Confusion Matrices</h2>
+                <img src="confusion_matrices.png" alt="Confusion Matrices">
+            </div>
+        """
+        
+        # Add error analysis if available
+        if os.path.exists(os.path.join(output_dir, "model_agreement_matrix.png")):
+            report_html += """
+            <div class="section">
+                <h2>Error Analysis</h2>
+                <h3>Model Agreement Matrix</h3>
+                <img src="model_agreement_matrix.png" alt="Model Agreement Matrix">
+                
+                <h3>Per-Class Accuracy</h3>
+                <img src="per_class_accuracy.png" alt="Per-Class Accuracy">
+            </div>
+            """
+        
+        # Add efficiency comparison if available
+        if os.path.exists(os.path.join(output_dir, "efficiency_comparison.png")):
+            report_html += """
+            <div class="section">
+                <h2>Efficiency Comparison</h2>
+                <img src="efficiency_comparison.png" alt="Efficiency Comparison">
+            </div>
+            """
+        
+        report_html += """
+        </body>
+        </html>
+        """
+    
+        # Save HTML report
+        with open(os.path.join(output_dir, "test_report.html"), "w") as f:
+            f.write(report_html)
+
     def run_pretrained_prediction(self):
         """Run prediction with selected pre-trained model"""
         if self.current_image is None:
@@ -942,6 +1167,76 @@ class ImageProcessorApp:
         train_augmented_btn = ttk.Button(dataset_buttons_frame, text="Train with Augmentation", 
                                         command=self.train_with_augmentation)
         train_augmented_btn.pack(side=tk.LEFT, padx=5)
+
+        # Tab for model testing (Week 13)
+        testing_tab = ttk.Frame(processing_tabs)
+        processing_tabs.add(testing_tab, text="Model Testing")
+
+        # Test dataset selection
+        dataset_frame = ttk.LabelFrame(testing_tab, text="Test Dataset Selection")
+        dataset_frame.pack(fill="x", expand=False, pady=5)
+
+        # Dataset path
+        dataset_path_frame = ttk.Frame(dataset_frame)
+        dataset_path_frame.pack(fill="x", padx=5, pady=5)
+
+        self.test_dataset_path_var = tk.StringVar()
+        ttk.Label(dataset_path_frame, text="Test Dataset:").pack(side=tk.LEFT, padx=5)
+        test_dataset_entry = ttk.Entry(dataset_path_frame, textvariable=self.test_dataset_path_var, width=50)
+        test_dataset_entry.pack(side=tk.LEFT, padx=5)
+        browse_test_dataset_btn = ttk.Button(dataset_path_frame, text="Browse", command=self.browse_test_dataset)
+        browse_test_dataset_btn.pack(side=tk.LEFT, padx=5)
+
+        # Output directory
+        output_dir_frame = ttk.Frame(dataset_frame)
+        output_dir_frame.pack(fill="x", padx=5, pady=5)
+
+        self.test_output_dir_var = tk.StringVar()
+        ttk.Label(output_dir_frame, text="Output Directory:").pack(side=tk.LEFT, padx=5)
+        test_output_entry = ttk.Entry(output_dir_frame, textvariable=self.test_output_dir_var, width=50)
+        test_output_entry.pack(side=tk.LEFT, padx=5)
+        browse_output_dir_btn = ttk.Button(output_dir_frame, text="Browse", command=self.browse_test_output_dir)
+        browse_output_dir_btn.pack(side=tk.LEFT, padx=5)
+
+        # Model selection for testing
+        models_frame = ttk.LabelFrame(testing_tab, text="Models to Test")
+        models_frame.pack(fill="x", expand=False, pady=5)
+
+        self.test_models = {
+            'cnn': tk.BooleanVar(value=True),
+            'ml': tk.BooleanVar(value=True),
+            'yolo': tk.BooleanVar(value=True)
+        }
+
+        models_grid = ttk.Frame(models_frame)
+        models_grid.pack(fill="x", padx=5, pady=5)
+
+        ttk.Checkbutton(models_grid, text="CNN Models", variable=self.test_models['cnn']).grid(row=0, column=0, padx=10, pady=2)
+        ttk.Checkbutton(models_grid, text="Traditional ML", variable=self.test_models['ml']).grid(row=0, column=1, padx=10, pady=2)
+        ttk.Checkbutton(models_grid, text="YOLO", variable=self.test_models['yolo']).grid(row=0, column=2, padx=10, pady=2)
+
+        # Testing options
+        options_frame = ttk.LabelFrame(testing_tab, text="Testing Options")
+        options_frame.pack(fill="x", expand=False, pady=5)
+
+        self.test_with_error_analysis_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(options_frame, text="Include Error Analysis", 
+                        variable=self.test_with_error_analysis_var).pack(anchor="w", padx=10, pady=2)
+
+        self.efficiency_comparison_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(options_frame, text="Include Efficiency Comparison", 
+                        variable=self.efficiency_comparison_var).pack(anchor="w", padx=10, pady=2)
+
+        # Testing buttons
+        testing_buttons_frame = ttk.Frame(testing_tab)
+        testing_buttons_frame.pack(fill="x", expand=False, pady=5)
+
+        run_test_btn = ttk.Button(testing_buttons_frame, text="Run Tests", command=self.run_model_tests)
+        run_test_btn.pack(side=tk.LEFT, padx=5, pady=5)
+
+        view_results_btn = ttk.Button(testing_buttons_frame, text="View Results", 
+                                    command=self.view_test_results)
+        view_results_btn.pack(side=tk.LEFT, padx=5, pady=5)
         
         # Reset button
         reset_btn = ttk.Button(left_panel, text="Reset Image", command=self.reset_image)
