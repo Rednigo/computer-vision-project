@@ -58,6 +58,474 @@ class ImageProcessorApp:
         self.create_image_widgets()
         self.create_video_widgets()
 
+    def load_pretrained_model(self):
+        """Load selected pre-trained model"""
+        model_type = self.pretrained_model_var.get()
+        
+        try:
+            if model_type == "ResNet50":
+                self.status_var.set("Loading ResNet50...")
+                self.root.update()
+                self.image_loader.load_resnet()
+                self.status_var.set("ResNet50 loaded successfully")
+                
+            elif model_type == "MobileNetV2":
+                self.status_var.set("Loading MobileNetV2...")
+                self.root.update()
+                self.image_loader.load_mobilenet()
+                self.status_var.set("MobileNetV2 loaded successfully")
+                
+            elif model_type == "YOLOv8":
+                yolo_type = self.yolo_type_var.get()
+                self.status_var.set(f"Loading {yolo_type}...")
+                self.root.update()
+                self.image_loader.load_yolo(model_type=yolo_type)
+                self.status_var.set(f"{yolo_type} loaded successfully")
+                
+            elif model_type == "U-Net":
+                # Ask if user wants to load existing model or create new
+                choice = messagebox.askyesno("U-Net", "Load existing U-Net model?\nYes = Load existing\nNo = Create new")
+                if choice:
+                    # Load existing model
+                    model_path = filedialog.askopenfilename(
+                        title="Load U-Net Model",
+                        filetypes=[("Keras Model", "*.h5"), ("SavedModel", "*.pb"), ("All Files", "*.*")]
+                    )
+                    if model_path:
+                        self.status_var.set("Loading U-Net model...")
+                        self.root.update()
+                        self.image_loader.load_pretrained_unet(model_path)
+                        self.status_var.set("U-Net loaded successfully")
+                else:
+                    # Create new model
+                    self.status_var.set("Creating new U-Net...")
+                    self.root.update()
+                    self.image_loader.create_unet()
+                    self.status_var.set("U-Net created successfully")
+        
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load model: {str(e)}")
+            self.status_var.set("Model loading failed")
+
+    def run_pretrained_prediction(self):
+        """Run prediction with selected pre-trained model"""
+        if self.current_image is None:
+            messagebox.showerror("Error", "No image selected")
+            return
+        
+        model_type = self.pretrained_model_var.get()
+        
+        try:
+            if model_type == "ResNet50":
+                self.status_var.set("Running ResNet50 prediction...")
+                self.root.update()
+                results = self.image_loader.predict_with_resnet()
+                
+                # Display results
+                result_text = "ResNet50 Predictions:\n"
+                for i, (class_id, description, score) in enumerate(results):
+                    result_text += f"{i+1}. {description} ({score:.3f})\n"
+                
+                self.show_results_dialog("ResNet50 Results", result_text)
+                
+            elif model_type == "MobileNetV2":
+                self.status_var.set("Running MobileNetV2 prediction...")
+                self.root.update()
+                results = self.image_loader.predict_with_mobilenet()
+                
+                # Display results
+                result_text = "MobileNetV2 Predictions:\n"
+                for i, (class_id, description, score) in enumerate(results):
+                    result_text += f"{i+1}. {description} ({score:.3f})\n"
+                
+                self.show_results_dialog("MobileNetV2 Results", result_text)
+                
+            elif model_type == "YOLOv8":
+                self.status_var.set("Running YOLO detection...")
+                self.root.update()
+                conf_threshold = self.yolo_conf_var.get()
+                detections, annotated_img = self.image_loader.detect_with_yolo(conf_threshold=conf_threshold)
+                
+                # Update current image with annotations
+                self.current_image = annotated_img
+                self.display_image(self.current_image)
+                
+                # Show detection results
+                result_text = "YOLO Detections:\n"
+                for det in detections:
+                    result_text += f"- {det['class']}: {det['confidence']:.3f} @ {det['bbox']}\n"
+                
+                self.show_results_dialog("YOLO Results", result_text)
+                
+            elif model_type == "U-Net":
+                self.status_var.set("Running U-Net segmentation...")
+                self.root.update()
+                mask, overlaid = self.image_loader.segment_with_unet()
+                
+                # Show options for display
+                choice = messagebox.askyesno("U-Net Results", "Show overlaid result?\nYes = Show overlay\nNo = Show mask")
+                if choice:
+                    self.current_image = overlaid
+                else:
+                    # Convert mask to RGB for display
+                    mask_rgb = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
+                    self.current_image = mask_rgb
+                
+                self.display_image(self.current_image)
+                self.status_var.set("U-Net segmentation completed")
+                
+            self.status_var.set(f"{model_type} prediction completed")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Prediction failed: {str(e)}")
+            self.status_var.set("Prediction failed")
+
+    def compare_pretrained_models(self):
+        """Compare results from all pre-trained models"""
+        if self.current_image is None:
+            messagebox.showerror("Error", "No image selected")
+            return
+        
+        try:
+            self.status_var.set("Comparing models...")
+            self.root.update()
+            
+            results = self.image_loader.compare_pretrained_models()
+            
+            # Format results for display
+            comparison_text = "Model Comparison Results:\n\n"
+            
+            # ResNet results
+            if isinstance(results['resnet'], list):
+                comparison_text += "ResNet50:\n"
+                for i, (_, description, score) in enumerate(results['resnet'][:3]):
+                    comparison_text += f"  {i+1}. {description} ({score:.3f})\n"
+            else:
+                comparison_text += f"ResNet50: {results['resnet']}\n"
+            
+            comparison_text += "\n"
+            
+            # MobileNet results
+            if isinstance(results['mobilenet'], list):
+                comparison_text += "MobileNetV2:\n"
+                for i, (_, description, score) in enumerate(results['mobilenet'][:3]):
+                    comparison_text += f"  {i+1}. {description} ({score:.3f})\n"
+            else:
+                comparison_text += f"MobileNetV2: {results['mobilenet']}\n"
+            
+            comparison_text += "\n"
+            
+            # YOLO results
+            if isinstance(results['yolo'], list):
+                comparison_text += "YOLO:\n"
+                for det in results['yolo'][:5]:
+                    comparison_text += f"  - {det['class']}: {det['confidence']:.3f}\n"
+            else:
+                comparison_text += f"YOLO: {results['yolo']}\n"
+            
+            self.show_results_dialog("Model Comparison", comparison_text)
+            self.status_var.set("Model comparison completed")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Comparison failed: {str(e)}")
+            self.status_var.set("Comparison failed")
+
+    def show_pretrained_model_info(self):
+        """Show information about selected pre-trained model"""
+        model_type = self.pretrained_model_var.get()
+        
+        try:
+            model_name_map = {
+                "ResNet50": "resnet",
+                "MobileNetV2": "mobilenet",
+                "YOLOv8": "yolo",
+                "U-Net": "unet"
+            }
+            
+            model_name = model_name_map.get(model_type)
+            if model_name:
+                info = self.image_loader.get_pretrained_model_info(model_name)
+                self.show_results_dialog(f"{model_type} Information", info)
+            else:
+                messagebox.showinfo("Info", f"Unknown model type: {model_type}")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to get model info: {str(e)}")
+
+    def apply_individual_augmentation(self, augmentation_type):
+        """Apply individual augmentation to current image"""
+        if self.current_image is None:
+            messagebox.showerror("Error", "No image selected")
+            return
+        
+        try:
+            if augmentation_type == 'brightness':
+                factor = self.brightness_var.get()
+                result = self.image_loader.apply_specific_augmentation(
+                    'brightness', brightness_range=(factor, factor))
+            
+            elif augmentation_type == 'contrast':
+                factor = self.contrast_var.get()
+                result = self.image_loader.apply_specific_augmentation(
+                    'contrast', contrast_range=(factor, factor))
+            
+            elif augmentation_type == 'noise':
+                noise_type = self.noise_type_var.get()
+                if noise_type == 'gaussian':
+                    result = self.image_loader.apply_specific_augmentation('gaussian_noise')
+                else:
+                    result = self.image_loader.apply_specific_augmentation('salt_pepper_noise')
+            
+            elif augmentation_type == 'blur':
+                blur_type = self.blur_type_var.get()
+                result = self.image_loader.apply_specific_augmentation('blur', blur_type=blur_type)
+            
+            elif augmentation_type == 'color':
+                result = self.image_loader.apply_specific_augmentation('color')
+            
+            self.current_image = result
+            self.display_image(self.current_image)
+            self.status_var.set(f"Applied {augmentation_type} augmentation")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Augmentation failed: {str(e)}")
+            self.status_var.set("Augmentation failed")
+
+    def apply_random_augmentation(self):
+        """Apply random augmentation with selected parameters"""
+        if self.current_image is None:
+            messagebox.showerror("Error", "No image selected")
+            return
+        
+        try:
+            # Get selected augmentation parameters
+            params = {key: var.get() for key, var in self.aug_params.items()}
+            
+            # Apply augmentation
+            result = self.image_loader.augment_loaded_image(params)
+            
+            self.current_image = result
+            self.display_image(self.current_image)
+            self.status_var.set("Applied random augmentation")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Random augmentation failed: {str(e)}")
+            self.status_var.set("Random augmentation failed")
+
+    def visualize_augmentations(self):
+        """Visualize multiple augmentation samples"""
+        if self.current_image is None:
+            messagebox.showerror("Error", "No image selected")
+            return
+        
+        try:
+            # Get selected augmentation parameters
+            params = {key: var.get() for key, var in self.aug_params.items()}
+            
+            # Visualize augmentations
+            fig = self.image_loader.visualize_augmentations(num_samples=8, augmentation_params=params)
+            
+            # Display the figure
+            import matplotlib
+            matplotlib.use('TkAgg')
+            import matplotlib.pyplot as plt
+            plt.show()
+            
+            self.status_var.set("Visualized augmentations")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Visualization failed: {str(e)}")
+            self.status_var.set("Visualization failed")
+
+    def compare_augmentations(self):
+        """Compare different augmentation effects"""
+        if self.current_image is None:
+            messagebox.showerror("Error", "No image selected")
+            return
+        
+        try:
+            # Compare different augmentation types
+            fig = self.image_loader.compare_augmentation_effects()
+            
+            # Display the figure
+            import matplotlib
+            matplotlib.use('TkAgg')
+            import matplotlib.pyplot as plt
+            plt.show()
+            
+            self.status_var.set("Compared augmentation effects")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Comparison failed: {str(e)}")
+            self.status_var.set("Comparison failed")
+
+    def preview_augmentation_pipeline(self):
+        """Preview augmentation pipeline effects"""
+        if self.current_image is None:
+            messagebox.showerror("Error", "No image selected")
+            return
+        
+        try:
+            severity = self.pipeline_severity_var.get()
+            
+            # Preview pipeline
+            fig = self.image_loader.preview_augmentation_pipeline(severity)
+            
+            # Display the figure
+            import matplotlib
+            matplotlib.use('TkAgg')
+            import matplotlib.pyplot as plt
+            plt.show()
+            
+            self.status_var.set(f"Previewed {severity} augmentation pipeline")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Pipeline preview failed: {str(e)}")
+            self.status_var.set("Pipeline preview failed")
+
+    def augment_dataset(self):
+        """Augment an entire dataset"""
+        # Get input directory
+        input_dir = filedialog.askdirectory(title="Select Input Dataset Directory")
+        if not input_dir:
+            return
+        
+        # Get output directory
+        output_dir = filedialog.askdirectory(title="Select Output Directory for Augmented Dataset")
+        if not output_dir:
+            return
+        
+        try:
+            # Get augmentation parameters
+            params = {key: var.get() for key, var in self.aug_params.items()}
+            factor = self.aug_factor_var.get()
+            
+            self.status_var.set(f"Augmenting dataset (factor: {factor})...")
+            self.root.update()
+            
+            # Augment dataset
+            stats = self.image_loader.augment_dataset(
+                input_dir,
+                output_dir,
+                augmentation_factor=factor,
+                augmentation_params=params
+            )
+            
+            # Show results
+            result_text = f"Dataset Augmentation Results:\n\n"
+            result_text += f"Original images: {stats['original_images']}\n"
+            result_text += f"Augmented images: {stats['augmented_images']}\n"
+            result_text += f"Failed images: {stats['failed_images']}\n"
+            result_text += f"Total output images: {stats['original_images'] + stats['augmented_images']}"
+            
+            self.show_results_dialog("Dataset Augmentation Complete", result_text)
+            self.status_var.set("Dataset augmentation completed")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Dataset augmentation failed: {str(e)}")
+            self.status_var.set("Dataset augmentation failed")
+
+    def train_with_augmentation(self):
+        """Train model with augmented data"""
+        # Get dataset directory
+        dataset_dir = filedialog.askdirectory(title="Select Dataset Directory")
+        if not dataset_dir:
+            return
+        
+        try:
+            # Get parameters
+            params = {key: var.get() for key, var in self.aug_params.items()}
+            factor = self.aug_factor_var.get()
+            model_type = self.classifier_type_var.get()
+            
+            self.status_var.set(f"Training with augmentation (factor: {factor})...")
+            self.root.update()
+            
+            # Train with augmentation
+            if model_type == "CNN":
+                epochs = self.epochs_var.get()
+                batch_size = self.batch_size_var.get()
+                
+                result = self.image_loader.train_with_augmentation(
+                    dataset_dir,
+                    augmentation_factor=factor,
+                    model_type='CNN',
+                    epochs=epochs,
+                    batch_size=batch_size,
+                    augmentation_params=params
+                )
+                
+                # Show training results
+                final_accuracy = result.history['accuracy'][-1]
+                final_val_accuracy = result.history['val_accuracy'][-1]
+                
+                result_text = f"Training Results:\n\n"
+                result_text += f"Final Accuracy: {final_accuracy:.3f}\n"
+                result_text += f"Final Validation Accuracy: {final_val_accuracy:.3f}\n"
+                result_text += f"Epochs: {epochs}\n"
+                result_text += f"Augmentation Factor: {factor}"
+                
+            else:
+                accuracy, report = self.image_loader.train_with_augmentation(
+                    dataset_dir,
+                    augmentation_factor=factor,
+                    model_type=model_type,
+                    augmentation_params=params
+                )
+                
+                result_text = f"Training Results:\n\n"
+                result_text += f"Accuracy: {accuracy:.3f}\n"
+                result_text += f"Augmentation Factor: {factor}\n\n"
+                result_text += "Classification Report:\n"
+                result_text += str(report)
+            
+            self.show_results_dialog("Training Complete", result_text)
+            self.status_var.set("Training with augmentation completed")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Training with augmentation failed: {str(e)}")
+            self.status_var.set("Training with augmentation failed")
+
+    def show_results_dialog(self, title, content):
+        """Show results in a dialog"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title(title)
+        dialog.geometry("600x400")
+        dialog.resizable(True, True)
+        
+        # Main frame
+        frame = ttk.Frame(dialog, padding="10")
+        frame.pack(fill="both", expand=True)
+        
+        # Text widget
+        text_widget = tk.Text(frame, wrap="word", width=60, height=20)
+        text_widget.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=text_widget.yview)
+        scrollbar.pack(side="right", fill="y")
+        
+        text_widget.config(yscrollcommand=scrollbar.set)
+        
+        # Insert content
+        text_widget.insert("1.0", content)
+        text_widget.config(state="disabled")
+        
+        # Close button
+        ttk.Button(frame, text="Close", command=dialog.destroy).pack(pady=10)
+        
+        # Make dialog modal
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Center dialog
+        dialog.update_idletasks()
+        width = dialog.winfo_width()
+        height = dialog.winfo_height()
+        x = (self.root.winfo_width() // 2) - (width // 2) + self.root.winfo_x()
+        y = (self.root.winfo_height() // 2) - (height // 2) + self.root.winfo_y()
+        dialog.geometry(f"{width}x{height}+{x}+{y}")
+
     def create_image_widgets(self):
         # Left panel for controls
         left_panel = ttk.Frame(self.image_frame)
@@ -313,6 +781,167 @@ class ImageProcessorApp:
 
         show_model_info_btn = ttk.Button(action_frame, text="Show Model Info", command=self.show_pretrained_model_info)
         show_model_info_btn.pack(side=tk.LEFT, padx=5, pady=5)
+
+        # Tab for data augmentation (Week 12)
+        augmentation_tab = ttk.Frame(processing_tabs)
+        processing_tabs.add(augmentation_tab, text="Data Augmentation")
+
+        # Individual augmentation controls
+        individual_frame = ttk.LabelFrame(augmentation_tab, text="Individual Augmentations")
+        individual_frame.pack(fill="x", expand=False, pady=5)
+
+        # Brightness controls
+        brightness_frame = ttk.Frame(individual_frame)
+        brightness_frame.grid(row=0, column=0, padx=5, pady=2, sticky="ew")
+        ttk.Label(brightness_frame, text="Brightness:").pack(side=tk.LEFT, padx=5)
+        self.brightness_var = tk.DoubleVar(value=1.0)
+        brightness_slider = ttk.Scale(brightness_frame, from_=0.5, to=1.5, orient="horizontal", 
+                                    variable=self.brightness_var, length=150)
+        brightness_slider.pack(side=tk.LEFT, padx=5)
+        ttk.Label(brightness_frame, textvariable=self.brightness_var).pack(side=tk.LEFT, padx=5)
+
+        # Contrast controls
+        contrast_frame = ttk.Frame(individual_frame)
+        contrast_frame.grid(row=1, column=0, padx=5, pady=2, sticky="ew")
+        ttk.Label(contrast_frame, text="Contrast:").pack(side=tk.LEFT, padx=5)
+        self.contrast_var = tk.DoubleVar(value=1.0)
+        contrast_slider = ttk.Scale(contrast_frame, from_=0.5, to=1.5, orient="horizontal", 
+                                variable=self.contrast_var, length=150)
+        contrast_slider.pack(side=tk.LEFT, padx=5)
+        ttk.Label(contrast_frame, textvariable=self.contrast_var).pack(side=tk.LEFT, padx=5)
+
+        # Noise controls
+        noise_frame = ttk.Frame(individual_frame)
+        noise_frame.grid(row=2, column=0, padx=5, pady=2, sticky="ew")
+        ttk.Label(noise_frame, text="Noise:").pack(side=tk.LEFT, padx=5)
+        self.noise_type_var = tk.StringVar(value="gaussian")
+        noise_types = ["gaussian", "salt_pepper"]
+        noise_type_combo = ttk.Combobox(noise_frame, values=noise_types, textvariable=self.noise_type_var, width=15)
+        noise_type_combo.pack(side=tk.LEFT, padx=5)
+
+        # Blur controls
+        blur_frame = ttk.Frame(individual_frame)
+        blur_frame.grid(row=3, column=0, padx=5, pady=2, sticky="ew")
+        ttk.Label(blur_frame, text="Blur:").pack(side=tk.LEFT, padx=5)
+        self.blur_type_var = tk.StringVar(value="gaussian")
+        blur_types = ["gaussian", "motion", "average"]
+        blur_type_combo = ttk.Combobox(blur_frame, values=blur_types, textvariable=self.blur_type_var, width=15)
+        blur_type_combo.pack(side=tk.LEFT, padx=5)
+
+        # Individual augmentation buttons
+        aug_buttons_frame = ttk.Frame(individual_frame)
+        aug_buttons_frame.grid(row=4, column=0, padx=5, pady=5, sticky="ew")
+
+        apply_brightness_btn = ttk.Button(aug_buttons_frame, text="Apply Brightness", 
+                                        command=lambda: self.apply_individual_augmentation('brightness'))
+        apply_brightness_btn.pack(side=tk.LEFT, padx=5)
+
+        apply_contrast_btn = ttk.Button(aug_buttons_frame, text="Apply Contrast", 
+                                    command=lambda: self.apply_individual_augmentation('contrast'))
+        apply_contrast_btn.pack(side=tk.LEFT, padx=5)
+
+        apply_noise_btn = ttk.Button(aug_buttons_frame, text="Add Noise", 
+                                    command=lambda: self.apply_individual_augmentation('noise'))
+        apply_noise_btn.pack(side=tk.LEFT, padx=5)
+
+        apply_blur_btn = ttk.Button(aug_buttons_frame, text="Apply Blur", 
+                                command=lambda: self.apply_individual_augmentation('blur'))
+        apply_blur_btn.pack(side=tk.LEFT, padx=5)
+
+        apply_color_btn = ttk.Button(aug_buttons_frame, text="Apply Color Aug", 
+                                    command=lambda: self.apply_individual_augmentation('color'))
+        apply_color_btn.pack(side=tk.LEFT, padx=5)
+
+        # Random augmentation controls
+        random_frame = ttk.LabelFrame(augmentation_tab, text="Random Augmentation")
+        random_frame.pack(fill="x", expand=False, pady=5)
+
+        # Augmentation parameters checkboxes
+        params_grid = ttk.Frame(random_frame)
+        params_grid.pack(fill="x", padx=5, pady=5)
+
+        self.aug_params = {
+            'geometry': tk.BooleanVar(value=True),
+            'brightness': tk.BooleanVar(value=True),
+            'contrast': tk.BooleanVar(value=True),
+            'noise': tk.BooleanVar(value=True),
+            'blur': tk.BooleanVar(value=True),
+            'color': tk.BooleanVar(value=True),
+            'elastic': tk.BooleanVar(value=False)
+        }
+
+        row, col = 0, 0
+        for param, var in self.aug_params.items():
+            cb = ttk.Checkbutton(params_grid, text=param.replace('_', ' ').title(), variable=var)
+            cb.grid(row=row, column=col, padx=5, pady=2, sticky="w")
+            col += 1
+            if col > 2:
+                col = 0
+                row += 1
+
+        # Random augmentation buttons
+        random_buttons_frame = ttk.Frame(random_frame)
+        random_buttons_frame.pack(fill="x", padx=5, pady=5)
+
+        apply_random_btn = ttk.Button(random_buttons_frame, text="Apply Random Augmentation", 
+                                    command=self.apply_random_augmentation)
+        apply_random_btn.pack(side=tk.LEFT, padx=5)
+
+        visualize_aug_btn = ttk.Button(random_buttons_frame, text="Visualize Augmentations", 
+                                    command=self.visualize_augmentations)
+        visualize_aug_btn.pack(side=tk.LEFT, padx=5)
+
+        compare_aug_btn = ttk.Button(random_buttons_frame, text="Compare Augmentations", 
+                                    command=self.compare_augmentations)
+        compare_aug_btn.pack(side=tk.LEFT, padx=5)
+
+        # Pipeline controls
+        pipeline_frame = ttk.LabelFrame(augmentation_tab, text="Augmentation Pipeline")
+        pipeline_frame.pack(fill="x", expand=False, pady=5)
+
+        # Pipeline severity selection
+        pipeline_select_frame = ttk.Frame(pipeline_frame)
+        pipeline_select_frame.pack(fill="x", padx=5, pady=5)
+
+        ttk.Label(pipeline_select_frame, text="Pipeline Severity:").pack(side=tk.LEFT, padx=5)
+        self.pipeline_severity_var = tk.StringVar(value="medium")
+        pipeline_severities = ["light", "medium", "heavy"]
+        pipeline_combo = ttk.Combobox(pipeline_select_frame, values=pipeline_severities, 
+                                    textvariable=self.pipeline_severity_var, width=15)
+        pipeline_combo.pack(side=tk.LEFT, padx=5)
+
+        # Pipeline buttons
+        pipeline_buttons_frame = ttk.Frame(pipeline_frame)
+        pipeline_buttons_frame.pack(fill="x", padx=5, pady=5)
+
+        preview_pipeline_btn = ttk.Button(pipeline_buttons_frame, text="Preview Pipeline", 
+                                        command=self.preview_augmentation_pipeline)
+        preview_pipeline_btn.pack(side=tk.LEFT, padx=5)
+
+        # Dataset augmentation controls
+        dataset_frame = ttk.LabelFrame(augmentation_tab, text="Dataset Augmentation")
+        dataset_frame.pack(fill="x", expand=False, pady=5)
+
+        # Augmentation factor
+        factor_frame = ttk.Frame(dataset_frame)
+        factor_frame.pack(fill="x", padx=5, pady=2)
+
+        ttk.Label(factor_frame, text="Augmentation Factor:").pack(side=tk.LEFT, padx=5)
+        self.aug_factor_var = tk.IntVar(value=5)
+        factor_spinbox = ttk.Spinbox(factor_frame, from_=1, to=20, textvariable=self.aug_factor_var, width=10)
+        factor_spinbox.pack(side=tk.LEFT, padx=5)
+
+        # Dataset augmentation buttons
+        dataset_buttons_frame = ttk.Frame(dataset_frame)
+        dataset_buttons_frame.pack(fill="x", padx=5, pady=5)
+
+        augment_dataset_btn = ttk.Button(dataset_buttons_frame, text="Augment Dataset", 
+                                        command=self.augment_dataset)
+        augment_dataset_btn.pack(side=tk.LEFT, padx=5)
+
+        train_augmented_btn = ttk.Button(dataset_buttons_frame, text="Train with Augmentation", 
+                                        command=self.train_with_augmentation)
+        train_augmented_btn.pack(side=tk.LEFT, padx=5)
         
         # Reset button
         reset_btn = ttk.Button(left_panel, text="Reset Image", command=self.reset_image)
@@ -766,6 +1395,10 @@ class ImageProcessorApp:
         if self.current_image is None:
             messagebox.showerror("Error", "No image loaded")
             return
+        
+        if process_type == 'pretrained':
+            # This is handled by the specific pre-trained model methods
+            pass
             
         if process_type == 'segmentation':
             action = self.segmentation_combobox.get()

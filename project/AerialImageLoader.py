@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from ObjectClassifier import ObjectClassifier
 from CNNClassifier import CNNClassifier
 from PreTrainedModels import PreTrainedModels
+from DataAugmentation import DataAugmentation
 
 class AerialImageLoader:
     """
@@ -31,9 +32,212 @@ class AerialImageLoader:
 
         self.classifier = ObjectClassifier()
         self.cnn_classifier = CNNClassifier()
-        self.pretrained_models = PreTrainedModels()  # Add this line
+        self.pretrained_models = PreTrainedModels()
+        self.data_augmentation = DataAugmentation()  # Add this line
 
+    def augment_loaded_image(self, augmentation_params=None):
+        """Augment the currently loaded image"""
+        if self.image is None:
+            raise ValueError("No image loaded")
+        
+        augmented = self.data_augmentation.augment_single_image(self.image, augmentation_params)
+        return augmented
 
+    def augment_dataset(self, input_dir, output_dir, augmentation_factor=5, 
+                    augmentation_params=None):
+        """Augment an entire dataset"""
+        return self.data_augmentation.augment_dataset(
+            input_dir, 
+            output_dir, 
+            augmentation_factor, 
+            augmentation_params
+        )
+
+    def visualize_augmentations(self, num_samples=8, augmentation_params=None):
+        """Visualize augmentation effects on current image"""
+        if self.image is None:
+            raise ValueError("No image loaded")
+        
+        return self.data_augmentation.visualize_augmentations(
+            self.image, 
+            num_samples, 
+            augmentation_params
+        )
+
+    def apply_specific_augmentation(self, augmentation_type, **kwargs):
+        """Apply specific augmentation to current image"""
+        if self.image is None:
+            raise ValueError("No image loaded")
+        
+        if augmentation_type == 'brightness':
+            return self.data_augmentation.augment_brightness(self.image, **kwargs)
+        elif augmentation_type == 'contrast':
+            return self.data_augmentation.augment_contrast(self.image, **kwargs)
+        elif augmentation_type == 'gaussian_noise':
+            return self.data_augmentation.add_gaussian_noise(self.image, **kwargs)
+        elif augmentation_type == 'salt_pepper_noise':
+            return self.data_augmentation.add_salt_pepper_noise(self.image, **kwargs)
+        elif augmentation_type == 'blur':
+            return self.data_augmentation.apply_blur(self.image, **kwargs)
+        elif augmentation_type == 'color':
+            return self.data_augmentation.color_augmentation(self.image, **kwargs)
+        elif augmentation_type == 'elastic':
+            return self.data_augmentation.elastic_transform(self.image, **kwargs)
+        else:
+            raise ValueError(f"Unknown augmentation type: {augmentation_type}")
+
+    def create_augmented_data_generator(self, directory, target_size=(224, 224), 
+                                    batch_size=32, class_mode='categorical'):
+        """Create data generator with augmentation for training"""
+        return self.data_augmentation.create_keras_data_generator(
+            directory, 
+            target_size, 
+            batch_size, 
+            class_mode
+        )
+
+    def train_with_augmentation(self, dataset_dir, augmentation_factor=5, 
+                            model_type='CNN', epochs=50, batch_size=32,
+                            augmentation_params=None):
+        """
+        Train a model with augmented data
+        
+        Args:
+            dataset_dir: Directory containing the dataset
+            augmentation_factor: Number of augmented versions per image
+            model_type: 'CNN' or 'Traditional'
+            epochs: Number of training epochs (for CNN)
+            batch_size: Batch size
+            augmentation_params: Dictionary of augmentation parameters
+            
+        Returns:
+            Training results
+        """
+        # Create temporary directory for augmented data
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Augment dataset
+            print("Augmenting dataset...")
+            stats = self.augment_dataset(
+                dataset_dir, 
+                temp_dir, 
+                augmentation_factor, 
+                augmentation_params
+            )
+            print(f"Augmentation stats: {stats}")
+            
+            # Train model on augmented data
+            if model_type == 'CNN':
+                print("Training CNN with augmented data...")
+                history = self.train_cnn_classifier(
+                    temp_dir,
+                    epochs=epochs,
+                    batch_size=batch_size,
+                    validation_split=0.2
+                )
+                return history
+            else:
+                print("Training traditional model with augmented data...")
+                from ObjectClassifier import ObjectClassifier
+                images, labels = ObjectClassifier().create_dataset_from_directory(temp_dir)
+                accuracy, report = self.classifier.train(images, labels, model_type)
+                return accuracy, report
+
+    def preview_augmentation_pipeline(self, aug_pipeline_name='medium', num_samples=9):
+        """
+        Preview different augmentation pipeline effects
+        
+        Args:
+            aug_pipeline_name: 'light', 'medium', or 'heavy'
+            num_samples: Number of samples to generate
+            
+        Returns:
+            Figure showing pipeline effects
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+        
+        import matplotlib.pyplot as plt
+        
+        # Create pipeline
+        pipeline = self.data_augmentation.advanced_augmentation_pipeline(aug_pipeline_name)
+        
+        # Generate samples
+        fig, axes = plt.subplots(3, 3, figsize=(15, 15))
+        axes = axes.ravel()
+        
+        # Convert to RGB for display
+        image_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
+        
+        # Original image
+        axes[0].imshow(image_rgb)
+        axes[0].set_title("Original")
+        axes[0].axis('off')
+        
+        # Apply pipeline multiple times
+        for i in range(1, num_samples):
+            augmented = pipeline(image=self.image)['image']
+            augmented_rgb = cv2.cvtColor(augmented, cv2.COLOR_BGR2RGB)
+            
+            axes[i].imshow(augmented_rgb)
+            axes[i].set_title(f"{aug_pipeline_name.capitalize()} Pipeline {i}")
+            axes[i].axis('off')
+        
+        plt.tight_layout()
+        return fig
+
+    def compare_augmentation_effects(self, augmentation_types=None):
+        """
+        Compare different augmentation effects side by side
+        
+        Args:
+            augmentation_types: List of augmentation types to compare
+            
+        Returns:
+            Figure showing comparison
+        """
+        if self.image is None:
+            raise ValueError("No image loaded")
+        
+        if augmentation_types is None:
+            augmentation_types = [
+                'brightness',
+                'contrast',
+                'gaussian_noise',
+                'blur',
+                'color',
+                'elastic'
+            ]
+        
+        import matplotlib.pyplot as plt
+        
+        n_types = len(augmentation_types)
+        cols = min(3, n_types)
+        rows = (n_types + cols - 1) // cols
+        
+        fig, axes = plt.subplots(rows, cols, figsize=(5*cols, 5*rows))
+        if n_types == 1:
+            axes = [axes]
+        else:
+            axes = axes.ravel()
+        
+        # Convert to RGB for display
+        image_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
+        
+        for i, aug_type in enumerate(augmentation_types):
+            augmented = self.apply_specific_augmentation(aug_type)
+            augmented_rgb = cv2.cvtColor(augmented, cv2.COLOR_BGR2RGB)
+            
+            axes[i].imshow(augmented_rgb)
+            axes[i].set_title(aug_type.replace('_', ' ').title())
+            axes[i].axis('off')
+        
+        # Hide unused subplots
+        for i in range(n_types, len(axes)):
+            axes[i].axis('off')
+        
+        plt.tight_layout()
+        return fig
 
     def _load_images_from_directory(self):
         """Loads paths to all images from the specified directory."""
