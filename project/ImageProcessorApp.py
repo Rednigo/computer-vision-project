@@ -105,7 +105,7 @@ class ImageProcessorApp:
         morphology_tab = ttk.Frame(processing_tabs)
         processing_tabs.add(morphology_tab, text="Morphology")
         
-        # Tab for object classification (Week 9)
+        # Tab for object classification (Week 9 & 10)
         classification_tab = ttk.Frame(processing_tabs)
         processing_tabs.add(classification_tab, text="Classification")
         
@@ -193,34 +193,75 @@ class ImageProcessorApp:
                                   command=lambda: self.process_image('morphology'))
         morphology_btn.grid(row=4, column=0, columnspan=3, padx=5, pady=5, sticky="ew")
         
-        # Classification controls (Week 9)
-        # Model selection
-        ttk.Label(classification_tab, text="Model Type:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        # Classification controls (Week 9 & 10)
+        # Model selection frame
+        model_frame = ttk.LabelFrame(classification_tab, text="Model Selection")
+        model_frame.pack(fill="x", expand=False, pady=5)
+        
+        # Traditional classifier controls
+        ttk.Label(model_frame, text="Traditional Model:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
         self.model_var = tk.StringVar(value="SVM")
         model_types = ["SVM", "RandomForest", "KNN"]
-        model_combobox = ttk.Combobox(classification_tab, values=model_types, textvariable=self.model_var, width=15)
+        model_combobox = ttk.Combobox(model_frame, values=model_types, textvariable=self.model_var, width=15)
         model_combobox.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         
         # Feature extractor selection
-        ttk.Label(classification_tab, text="Feature Extractor:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        ttk.Label(model_frame, text="Feature Extractor:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
         self.feature_extractor_var = tk.StringVar(value="HOG")
         feature_extractors = ["HOG", "SIFT", "ORB"]
-        feature_extractor_combobox = ttk.Combobox(classification_tab, values=feature_extractors, textvariable=self.feature_extractor_var, width=15)
+        feature_extractor_combobox = ttk.Combobox(model_frame, values=feature_extractors, textvariable=self.feature_extractor_var, width=15)
         feature_extractor_combobox.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
         
-        # Training buttons
-        train_btn = ttk.Button(classification_tab, text="Train Model", command=self.train_classifier)
-        train_btn.grid(row=2, column=0, padx=5, pady=5, sticky="ew")
+        # Model type selection (Traditional vs CNN)
+        model_type_frame = ttk.LabelFrame(classification_tab, text="Classifier Type")
+        model_type_frame.pack(fill="x", expand=False, pady=5)
         
-        classify_btn = ttk.Button(classification_tab, text="Classify Image", command=self.classify_image)
-        classify_btn.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+        self.classifier_type_var = tk.StringVar(value="Traditional")
+        ttk.Radiobutton(model_type_frame, text="Traditional ML", variable=self.classifier_type_var, value="Traditional").pack(anchor="w", padx=5, pady=2)
+        ttk.Radiobutton(model_type_frame, text="CNN Deep Learning", variable=self.classifier_type_var, value="CNN").pack(anchor="w", padx=5, pady=2)
+        
+        # CNN parameters frame
+        cnn_params_frame = ttk.LabelFrame(classification_tab, text="CNN Parameters")
+        cnn_params_frame.pack(fill="x", expand=False, pady=5)
+        
+        ttk.Label(cnn_params_frame, text="Epochs:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.epochs_var = tk.IntVar(value=50)
+        epochs_spinbox = ttk.Spinbox(cnn_params_frame, from_=10, to=200, textvariable=self.epochs_var, width=10)
+        epochs_spinbox.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        
+        ttk.Label(cnn_params_frame, text="Batch Size:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        self.batch_size_var = tk.IntVar(value=32)
+        batch_sizes = [16, 32, 64, 128]
+        batch_size_combobox = ttk.Combobox(cnn_params_frame, values=batch_sizes, textvariable=self.batch_size_var, width=10)
+        batch_size_combobox.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        
+        # Training buttons
+        train_frame = ttk.Frame(classification_tab)
+        train_frame.pack(fill="x", expand=False, pady=5)
+        
+        train_btn = ttk.Button(train_frame, text="Train Model", command=self.train_classifier)
+        train_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        
+        classify_btn = ttk.Button(train_frame, text="Classify Image", command=self.classify_image)
+        classify_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        
+        # Training history button for CNN
+        history_btn = ttk.Button(train_frame, text="Show Training History", command=self.show_training_history)
+        history_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        
+        # Model summary button for CNN
+        summary_btn = ttk.Button(train_frame, text="Show Model Summary", command=self.show_model_summary)
+        summary_btn.pack(side=tk.LEFT, padx=5, pady=5)
         
         # Load/save model buttons
-        load_model_btn = ttk.Button(classification_tab, text="Load Model", command=self.load_classifier_model)
-        load_model_btn.grid(row=3, column=0, padx=5, pady=5, sticky="ew")
+        model_file_frame = ttk.Frame(classification_tab)
+        model_file_frame.pack(fill="x", expand=False, pady=5)
         
-        save_model_btn = ttk.Button(classification_tab, text="Save Model", command=self.save_classifier_model)
-        save_model_btn.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
+        load_model_btn = ttk.Button(model_file_frame, text="Load Model", command=self.load_classifier_model)
+        load_model_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        
+        save_model_btn = ttk.Button(model_file_frame, text="Save Model", command=self.save_classifier_model)
+        save_model_btn.pack(side=tk.LEFT, padx=5, pady=5)
         
         # Reset button
         reset_btn = ttk.Button(left_panel, text="Reset Image", command=self.reset_image)
@@ -379,59 +420,85 @@ class ImageProcessorApp:
 
     # Classification-related methods
     def train_classifier(self):
-        """Train classifier on a dataset"""
-        if not hasattr(self.image_loader, 'classifier'):
-            messagebox.showerror("Error", "Classifier not available in AerialImageLoader")
-            return
-            
+        """Train selected classifier type"""
+        classifier_type = self.classifier_type_var.get()
+        
         # Get dataset directory from user
         dataset_dir = filedialog.askdirectory(title="Select Dataset Directory")
         if not dataset_dir:
             return
-            
-        # Get model and feature extractor types
-        model_type = self.model_var.get()
-        feature_method = self.feature_extractor_var.get()
-        
-        # Update status
-        self.status_var.set(f"Training {model_type} model with {feature_method} features...")
-        self.root.update()
         
         try:
-            # Train classifier
-            accuracy, report = self.image_loader.train_classifier(
-                dataset_dir, 
-                model_type=model_type, 
-                feature_method=feature_method
-            )
-            
-            # Show results
-            result_dialog = ClassifierResultDialog(self.root, 
-                                               model_type=model_type,
-                                               feature_method=feature_method,
-                                               accuracy=accuracy,
-                                               report=report)
-            
-            # Update status
-            self.status_var.set(f"Model trained: {model_type} (Accuracy: {accuracy:.2f})")
-            
+            if classifier_type == "Traditional":
+                # Traditional ML classifier training
+                model_type = self.model_var.get()
+                feature_method = self.feature_extractor_var.get()
+                
+                self.status_var.set(f"Training {model_type} model with {feature_method} features...")
+                self.root.update()
+                
+                accuracy, report = self.image_loader.train_classifier(
+                    dataset_dir, 
+                    model_type=model_type, 
+                    feature_method=feature_method
+                )
+                
+                # Show results
+                result_dialog = ClassifierResultDialog(self.root, 
+                                                   model_type=model_type,
+                                                   feature_method=feature_method,
+                                                   accuracy=accuracy,
+                                                   report=report)
+                
+                self.status_var.set(f"Model trained: {model_type} (Accuracy: {accuracy:.2f})")
+                
+            elif classifier_type == "CNN":
+                # CNN training
+                epochs = self.epochs_var.get()
+                batch_size = self.batch_size_var.get()
+                
+                self.status_var.set(f"Training CNN model (Epochs: {epochs}, Batch Size: {batch_size})...")
+                self.root.update()
+                
+                history = self.image_loader.train_cnn_classifier(
+                    dataset_dir,
+                    epochs=epochs,
+                    batch_size=batch_size,
+                    validation_split=0.2
+                )
+                
+                # Get final training metrics
+                final_accuracy = history.history['accuracy'][-1]
+                final_val_accuracy = history.history['val_accuracy'][-1]
+                
+                self.status_var.set(f"CNN trained - Accuracy: {final_accuracy:.3f}, Val Accuracy: {final_val_accuracy:.3f}")
+                
         except Exception as e:
             messagebox.showerror("Error", f"Training failed: {str(e)}")
             self.status_var.set("Training failed")
     
     def classify_image(self):
-        """Classify the current image"""
+        """Classify using selected classifier type"""
         if self.current_image is None:
             messagebox.showerror("Error", "No image selected")
             return
-            
-        if not hasattr(self.image_loader, 'classifier') or self.image_loader.classifier.model is None:
-            messagebox.showerror("Error", "No trained model available")
-            return
-            
+        
+        classifier_type = self.classifier_type_var.get()
+        
         try:
-            # Classify image
-            predicted_class, confidence = self.image_loader.classify_image()
+            if classifier_type == "Traditional":
+                if self.image_loader.classifier.model is None:
+                    messagebox.showerror("Error", "No traditional model available")
+                    return
+                    
+                predicted_class, confidence = self.image_loader.classify_image()
+                
+            elif classifier_type == "CNN":
+                if self.image_loader.cnn_classifier.model is None:
+                    messagebox.showerror("Error", "No CNN model available")
+                    return
+                    
+                predicted_class, confidence = self.image_loader.classify_image_cnn()
             
             # Display result on image
             result_image = self.image_loader.draw_classification_result(predicted_class, confidence)
@@ -446,32 +513,69 @@ class ImageProcessorApp:
             messagebox.showerror("Error", f"Classification failed: {str(e)}")
             self.status_var.set("Classification failed")
     
+    def show_training_history(self):
+        """Show CNN training history plots"""
+        classifier_type = self.classifier_type_var.get()
+        
+        if classifier_type == "CNN":
+            try:
+                self.image_loader.plot_cnn_training_history()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to show training history: {str(e)}")
+        else:
+            messagebox.showinfo("Info", "Training history is only available for CNN models")
+    
+    def show_model_summary(self):
+        """Show CNN model architecture summary"""
+        classifier_type = self.classifier_type_var.get()
+        
+        if classifier_type == "CNN":
+            try:
+                summary = self.image_loader.get_cnn_summary()
+                # Create a dialog to display the summary
+                summary_dialog = ModelSummaryDialog(self.root, summary)
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to show model summary: {str(e)}")
+        else:
+            messagebox.showinfo("Info", "Model summary is only available for CNN models")
+    
     def load_classifier_model(self):
-        """Load a trained classifier model"""
-        if not hasattr(self.image_loader, 'classifier'):
-            messagebox.showerror("Error", "Classifier not available in AerialImageLoader")
-            return
-            
-        # Get model file from user
-        model_path = filedialog.askopenfilename(
-            title="Load Model",
-            filetypes=[("Pickle Files", "*.pkl"), ("All Files", "*.*")]
-        )
+        """Load model based on selected classifier type"""
+        classifier_type = self.classifier_type_var.get()
+        
+        if classifier_type == "Traditional":
+            # Load traditional ML model (.pkl)
+            model_path = filedialog.askopenfilename(
+                title="Load Model",
+                filetypes=[("Pickle Files", "*.pkl"), ("All Files", "*.*")]
+            )
+        else:  # CNN
+            # Load CNN model files
+            model_path = filedialog.askopenfilename(
+                title="Load CNN Model",
+                filetypes=[("HDF5 Files", "*.h5"), ("All Files", "*.*")]
+            )
+            if model_path and model_path.endswith('.h5'):
+                # Remove .h5 extension for loading
+                model_path = model_path[:-3]
         
         if not model_path:
             return
-            
+        
         try:
-            # Load model
-            self.image_loader.load_classifier_model(model_path)
+            if classifier_type == "Traditional":
+                self.image_loader.load_classifier_model(model_path)
+                
+                # Update UI
+                if hasattr(self.image_loader.classifier, 'model_type'):
+                    self.model_var.set(self.image_loader.classifier.model_type)
+                    
+                if hasattr(self.image_loader.classifier, 'feature_extractor'):
+                    self.feature_extractor_var.set(self.image_loader.classifier.feature_extractor)
+                    
+            else:  # CNN
+                self.image_loader.load_cnn_model(model_path)
             
-            # Update UI
-            if hasattr(self.image_loader.classifier, 'model_type'):
-                self.model_var.set(self.image_loader.classifier.model_type)
-                
-            if hasattr(self.image_loader.classifier, 'feature_extractor'):
-                self.feature_extractor_var.set(self.image_loader.classifier.feature_extractor)
-                
             # Update status
             self.status_var.set(f"Model loaded from: {os.path.basename(model_path)}")
             
@@ -480,24 +584,41 @@ class ImageProcessorApp:
             self.status_var.set("Model loading failed")
     
     def save_classifier_model(self):
-        """Save the trained classifier model"""
-        if not hasattr(self.image_loader, 'classifier') or self.image_loader.classifier.model is None:
-            messagebox.showerror("Error", "No trained model to save")
-            return
-            
-        # Get save path from user
-        model_path = filedialog.asksaveasfilename(
-            title="Save Model",
-            defaultextension=".pkl",
-            filetypes=[("Pickle Files", "*.pkl"), ("All Files", "*.*")]
-        )
+        """Save model based on selected classifier type"""
+        classifier_type = self.classifier_type_var.get()
+        
+        if classifier_type == "Traditional":
+            if self.image_loader.classifier.model is None:
+                messagebox.showerror("Error", "No traditional model to save")
+                return
+                
+            model_path = filedialog.asksaveasfilename(
+                title="Save Model",
+                defaultextension=".pkl",
+                filetypes=[("Pickle Files", "*.pkl"), ("All Files", "*.*")]
+            )
+        else:  # CNN
+            if self.image_loader.cnn_classifier.model is None:
+                messagebox.showerror("Error", "No CNN model to save")
+                return
+                
+            model_path = filedialog.asksaveasfilename(
+                title="Save CNN Model",
+                defaultextension=".h5",
+                filetypes=[("HDF5 Files", "*.h5"), ("All Files", "*.*")]
+            )
+            if model_path and model_path.endswith('.h5'):
+                # Remove .h5 extension for saving
+                model_path = model_path[:-3]
         
         if not model_path:
             return
-            
+        
         try:
-            # Save model
-            self.image_loader.save_classifier_model(model_path)
+            if classifier_type == "Traditional":
+                self.image_loader.save_classifier_model(model_path)
+            else:  # CNN
+                self.image_loader.save_cnn_model(model_path)
             
             # Update status
             self.status_var.set(f"Model saved to: {os.path.basename(model_path)}")
@@ -773,18 +894,6 @@ class ImageProcessorApp:
                 messagebox.showerror("Error", f"Morphological operation failed: {str(e)}")
                 return
                 
-        # Classification процес можна додати тут, якщо необхідно обробити зображення перед класифікацією
-        elif process_type == 'classification':
-            try:
-                # Отримання результатів класифікації
-                predicted_class, confidence = self.image_loader.classify_image()
-                
-                # Відображення результатів на зображенні
-                result_image = self.image_loader.draw_classification_result(predicted_class, confidence)
-                
-            except Exception as e:
-                messagebox.showerror("Error", f"Classification failed: {str(e)}")
-                return
         else:
             messagebox.showerror("Error", "Invalid process type")
             return
@@ -1176,6 +1285,51 @@ class ClassifierResultDialog(tk.Toplevel):
         # Insert the report
         report_text.insert("1.0", report)
         report_text.config(state="disabled")  # Make read-only
+        
+        # Close button
+        ttk.Button(frame, text="Close", command=self.destroy).pack(pady=10)
+        
+        # Make dialog modal
+        self.transient(parent)
+        self.grab_set()
+        
+        # Center the dialog
+        self.update_idletasks()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        x = (parent.winfo_width() // 2) - (width // 2) + parent.winfo_x()
+        y = (parent.winfo_height() // 2) - (height // 2) + parent.winfo_y()
+        self.geometry(f"{width}x{height}+{x}+{y}")
+
+
+class ModelSummaryDialog(tk.Toplevel):
+    """Dialog to display CNN model summary."""
+    def __init__(self, parent, summary_text):
+        super().__init__(parent)
+        self.title("CNN Model Summary")
+        self.geometry("600x400")
+        self.resizable(True, True)
+        
+        # Main frame
+        frame = ttk.Frame(self, padding="10")
+        frame.pack(fill="both", expand=True)
+        
+        # Text widget for the summary
+        summary_display = tk.Text(frame, wrap="none", width=60, height=20)
+        summary_display.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        
+        # Scrollbars
+        y_scrollbar = ttk.Scrollbar(frame, orient="vertical", command=summary_display.yview)
+        y_scrollbar.pack(side="right", fill="y")
+        
+        x_scrollbar = ttk.Scrollbar(frame, orient="horizontal", command=summary_display.xview)
+        x_scrollbar.pack(side="bottom", fill="x")
+        
+        summary_display.config(yscrollcommand=y_scrollbar.set, xscrollcommand=x_scrollbar.set)
+        
+        # Insert the summary
+        summary_display.insert("1.0", summary_text)
+        summary_display.config(state="disabled")  # Make read-only
         
         # Close button
         ttk.Button(frame, text="Close", command=self.destroy).pack(pady=10)
